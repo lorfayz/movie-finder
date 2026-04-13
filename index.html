@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Идеальный фильм — поиск по году и жанру</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Найди идеальный фильм</h1>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label>Год выпуска:</label>
+                <input type="number" id="year" placeholder="например 2023" min="1900" max="2030">
+            </div>
+
+            <div class="filter-group">
+                <label>Жанр:</label>
+                <select id="genre">
+                    <option value="">Любой</option>
+                    <option value="28">Боевик</option>
+                    <option value="12">Приключения</option>
+                    <option value="16">Мультфильм</option>
+                    <option value="35">Комедия</option>
+                    <option value="80">Криминал</option>
+                    <option value="18">Драма</option>
+                    <option value="14">Фэнтези</option>
+                    <option value="27">Ужасы</option>
+                    <option value="10749">Мелодрама</option>
+                    <option value="878">Фантастика</option>
+                    <option value="53">Триллер</option>
+                    <option value="10752">Военный</option>
+                </select>
+            </div>
+
+            <div class="filter-group exclude-group">
+                <label>Исключить темы (через запятую):</label>
+                <input type="text" id="excludeTopics" placeholder="например: насилие, депрессия, политика">
+            </div>
+
+            <button id="searchBtn">🔍 Искать фильмы</button>
+        </div>
+
+        <div id="results" class="results"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
