@@ -1,0 +1,159 @@
+
+const TMDB_API_KEY = 'f6cd8b128495cd6bb3ab36b3c8877464'; // Замени на свой ключ
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
+
+function populateYears() {
+    const yearSelect = document.getElementById('year');
+    const currentYear = new Date().getFullYear();
+    for (let y = currentYear; y >= 1950; y--) {
+        const option = document.createElement('option');
+        option.value = y;
+        option.textContent = y;
+        yearSelect.appendChild(option);
+    }
+}
+
+function containsExcludedKeywords(text, excludeList) {
+    if (!text || excludeList.length === 0) return false;
+    const lowerText = text.toLowerCase();
+    return excludeList.some(keyword => 
+        lowerText.includes(keyword.toLowerCase().trim())
+    );
+}
+
+async function fetchReviews(movieId) {
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/movie/${movieId}/reviews?api_key=$f6cd8b128495cd6bb3ab36b3c8877464&language=ru-RU`
+        );
+        const data = await response.json();
+        
+        if (data.results && data.results.length > 0) {
+            return data.results.slice(0, 2).map(review => ({
+                author: review.author,
+                text: review.content.substring(0, 200) + (review.content.length > 200 ? '...' : ''),
+                rating: review.author_details.rating || 'нет оценки'
+            }));
+        }
+        return [];
+    } catch (e) {
+        console.error('Ошибка загрузки рецензий:', e);
+        return [];
+    }
+}
+
+async function searchMovies() {
+    const year = document.getElementById('year').value;
+    const genreId = document.getElementById('genre').value;
+    const excludeRaw = document.getElementById('excludeKeywords').value;
+    const excludeKeywords = excludeRaw ? excludeRaw.split(',').map(k => k.trim()).filter(k => k) : [];
+    
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = '<div class="no-results">⏳ Ищем идеальный фильм...</div>';
+    
+    
+    let url = `${TMDB_BASE_URL}/discover/movie?api_key=$f6cd8b128495cd6bb3ab36b3c8877464&language=ru-RU&sort_by=vote_average.desc&vote_count.gte=100&primary_release_year=${year}`;
+    
+    if (genreId) {
+        url += `&with_genres=${genreId}`;
+    }
+    
+    try {
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        let movies = data.results || [];
+        
+        if (movies.length === 0) {
+            resultsDiv.innerHTML = '<div class="no-results">😢 Нет фильмов за этот год</div>';
+            return;
+        }
+        
+        const filteredMovies = [];
+        
+        for (const movie of movies) {
+           
+            const detailResponse = await fetch(
+                `${TMDB_BASE_URL}/movie/${movie.id}?api_key=$f6cd8b128495cd6bb3ab36b3c8877464&language=ru-RU`
+            );
+            const details = await detailResponse.json();
+            
+            const description = details.overview || '';
+            const title = movie.title || movie.original_title || 'Без названия';
+            
+            if (containsExcludedKeywords(description, excludeKeywords)) {
+                console.log(`❌ Исключён: ${title} (содержит запрещённые темы)`);
+                continue;
+            }
+            
+            const reviews = await fetchReviews(movie.id);
+            
+            filteredMovies.push({
+                id: movie.id,
+                title: title,
+                year: movie.release_date ? movie.release_date.split('-')[0] : year,
+                rating: movie.vote_average ? movie.vote_average.toFixed(1) : '—',
+                posterPath: movie.poster_path,
+                description: description,
+                reviews: reviews
+            });
+            
+            if (filteredMovies.length >= 9) break; 
+        }
+        
+        displayResults(filteredMovies, excludeKeywords);
+        
+    } catch (error) {
+        console.error('Ошибка:', error);
+        resultsDiv.innerHTML = `<div class="no-results">❌ Ошибка: ${error.message}<br><br>🔑 Проверь API ключ в файле script.js (строка 2)</div>`;
+    }
+}
+
+function displayResults(movies, excludeKeywords) {
+    const resultsDiv = document.getElementById('results');
+    
+    if (movies.length === 0) {
+        resultsDiv.innerHTML = `<div class="no-results">
+            😢 Нет фильмов без тем: <strong>${excludeKeywords.join(', ') || '—'}</strong><br><br>
+            Попробуй расширить поиск или убрать некоторые исключения
+        </div>`;
+        return;
+    }
+    
+    resultsDiv.innerHTML = movies.map(movie => `
+        <div class="movie-card">
+            <img class="movie-poster" src="${movie.posterPath ? TMDB_IMAGE_URL + movie.posterPath : 'https://via.placeholder.com/500x750?text=Нет+постера'}" 
+                 alt="${movie.title}">
+            <div class="movie-title">${movie.title}</div>
+            <div class="movie-year">📅 ${movie.year} | ⭐ Рейтинг: ${movie.rating}/10</div>
+            <div class="movie-description">${movie.description || 'Описание отсутствует'}</div>
+            ${renderReviews(movie.reviews)}
+        </div>
+    `).join('');
+}
+
+function renderReviews(reviews) {
+    if (!reviews || reviews.length === 0) {
+        return '<div class="review">📝 Нет рецензий на этом сервисе</div>';
+    }
+    
+    return reviews.map(r => `
+        <div class="review">
+            <div class="review-author">✍️ ${r.author}</div>
+            <div>💬 ${r.text}</div>
+            ${r.rating !== 'нет оценки' ? `<div>⭐ Оценка: ${r.rating}/10</div>` : ''}
+        </div>
+    `).join('');
+}
+
+populateYears();
+document.getElementById('searchBtn').addEventListener('click', searchMovies);
+
+document.getElementById('excludeKeywords').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') searchMovies();
+});
