@@ -3,46 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Идеальный фильм - поиск по году и жанру</title>
+    <title>MovieFinder - Идеальный подбор фильмов</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <h1>🎬 Найди идеальный фильм</h1>
-        
-        <div class="filters">
-            <div class="filter-group">
-                <label>Год выпуска:</label>
-                <select id="year"></select>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-film"></i>
+                    <h1>MovieFinder</h1>
+                </div>
+                <p class="tagline">Найди идеальный фильм по душе</p>
             </div>
-            
-            <div class="filter-group">
-                <label>Жанр:</label>
-                <select id="genre">
-                    <option value="">Любой</option>
-                    <option value="1">Комедия</option>
-                    <option value="2">Драма</option>
-                    <option value="3">Боевик</option>
-                    <option value="4">Триллер</option>
-                    <option value="5">Фантастика</option>
-                    <option value="6">Ужасы</option>
-                    <option value="7">Мелодрама</option>
-                    <option value="8">Детектив</option>
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <label>Исключить темы в описании:</label>
-                <input type="text" id="excludeKeywords" placeholder="война, депрессия, насилие">
-                <small>Через запятую</small>
-            </div>
-            
-            <button id="searchBtn">🔍 Искать фильм</button>
         </div>
-        
-        <div id="results" class="results"></div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <section class="filter-section">
+                <div class="filter-card">
+                    <h2><i class="fas fa-sliders-h"></i> Параметры поиска</h2>
+                    
+                    <div class="filter-grid">
+                        <div class="filter-group">
+                            <label for="yearFrom"><i class="far fa-calendar-alt"></i> Год выпуска (от)</label>
+                            <input type="number" id="yearFrom" placeholder="Например: 2010" min="1890" max="2026" value="2010">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="yearTo"><i class="far fa-calendar-alt"></i> Год выпуска (до)</label>
+                            <input type="number" id="yearTo" placeholder="Например: 2024" min="1890" max="2026" value="2024">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="genre"><i class="fas fa-tags"></i> Жанр</label>
+                            <select id="genre">
+                                <option value="">Все жанры</option>
+                                <option value="1">Боевик</option>
+                                <option value="2">Драма</option>
+                                <option value="3">Комедия</option>
+                                <option value="4">Триллер</option>
+                                <option value="5">Ужасы</option>
+                                <option value="6">Фантастика</option>
+                                <option value="7">Фэнтези</option>
+                                <option value="8">Мелодрама</option>
+                                <option value="9">Детектив</option>
+                                <option value="10">Приключения</option>
+                                <option value="11">Криминал</option>
+                                <option value="12">Исторический</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="ratingFrom"><i class="fas fa-star"></i> Рейтинг КП (от)</label>
+                            <input type="number" id="ratingFrom" step="0.1" min="0" max="10" placeholder="Например: 7.5" value="7.0">
+                        </div>
+                    </div>
+                    
+                    <div class="exclude-section">
+                        <label><i class="fas fa-ban"></i> Исключить фильмы с этими темами в описании:</label>
+                        <div class="exclude-tags">
+                            <button class="exclude-tag" data-tag="насилие">❌ насилие</button>
+                            <button class="exclude-tag" data-tag="жестокость">❌ жестокость</button>
+                            <button class="exclude-tag" data-tag="кровь">❌ кровь</button>
+                            <button class="exclude-tag" data-tag="ужасы">❌ ужасы</button>
+                            <button class="exclude-tag" data-tag="депрессия">❌ депрессия</button>
+                            <button class="exclude-tag" data-tag="трагедия">❌ трагедия</button>
+                        </div>
+                        <div class="exclude-custom">
+                            <input type="text" id="customExclude" placeholder="Или введите свою тему...">
+                            <button id="addExcludeBtn" class="btn-secondary">+ Добавить</button>
+                        </div>
+                        <div class="active-excludes">
+                            <span>Активные исключения:</span>
+                            <div id="activeExcludesList" class="exclude-list"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-actions">
+                        <button id="searchBtn" class="btn-primary" onclick="window.searchMovies()">
+                            <i class="fas fa-search"></i> Найти идеальный фильм
+                        </button>
+                        <button id="resetBtn" class="btn-secondary" onclick="window.resetFilters()">
+                            <i class="fas fa-undo-alt"></i> Сбросить
+                        </button>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="results-section">
+                <div class="results-header">
+                    <h2><i class="fas fa-clapperboard"></i> Найденные фильмы</h2>
+                    <div class="results-count" id="resultsCount">0 фильмов</div>
+                </div>
+                
+                <div id="moviesContainer" class="movies-grid">
+                    <div class="loading-placeholder">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Настройте параметры и нажмите "Найти фильм"</p>
+                    </div>
+                </div>
+                
+                <div class="pagination" id="pagination" style="display: none;">
+                    <button id="loadMoreBtn" class="btn-secondary" onclick="window.loadMore()">
+                        <i class="fas fa-chevron-down"></i> Загрузить ещё
+                    </button>
+                </div>
+            </section>
+        </div>
+    </main>
+    <div id="reviewsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-comments"></i> Рецензии</h3>
+                <span class="close" onclick="window.closeModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="reviewsContent">
+                <p>Загрузка рецензий...</p>
+            </div>
+        </div>
     </div>
-    
     <script src="script.js"></script>
 </body>
 </html>
