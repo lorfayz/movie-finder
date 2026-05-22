@@ -62,6 +62,7 @@ function isDescriptionValid(description) {
     }
     return true;
 }
+
 async function searchMovies() {
     const year = yearInput.value.trim();
     const genreId = genreSelect.value;
