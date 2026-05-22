@@ -3,49 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Идеальный фильм — поиск по году и жанру</title>
+    <title>Идеальный фильм - поиск по году и жанру | TMDB</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <h1>🎬 Найди идеальный фильм</h1>
-
+        
         <div class="filters">
+            <!-- ЭЛЕМЕНТ 1: Выбор года -->
             <div class="filter-group">
-                <label>Год выпуска:</label>
-                <input type="number" id="year" placeholder="например 2023" min="1900" max="2030">
+                <label>📅 Год выпуска:</label>
+                <select id="year"></select>
             </div>
-
+            
+            <!-- ЭЛЕМЕНТ 2: Выбор жанра -->
             <div class="filter-group">
-                <label>Жанр:</label>
+                <label>🎭 Жанр:</label>
                 <select id="genre">
-                    <option value="">Любой</option>
-                    <option value="28">Боевик</option>
-                    <option value="12">Приключения</option>
-                    <option value="16">Мультфильм</option>
-                    <option value="35">Комедия</option>
-                    <option value="80">Криминал</option>
-                    <option value="18">Драма</option>
-                    <option value="14">Фэнтези</option>
-                    <option value="27">Ужасы</option>
-                    <option value="10749">Мелодрама</option>
-                    <option value="878">Фантастика</option>
-                    <option value="53">Триллер</option>
-                    <option value="10752">Военный</option>
+                    <option value="">🎯 Любой</option>
+                    <option value="28">💥 Боевик</option>
+                    <option value="12">🗺️ Приключения</option>
+                    <option value="16">🎨 Мультфильм</option>
+                    <option value="35">😂 Комедия</option>
+                    <option value="80">🔫 Криминал</option>
+                    <option value="18">🎭 Драма</option>
+                    <option value="10751">👨‍👩‍👧‍👦 Семейный</option>
+                    <option value="14">🐉 Фэнтези</option>
+                    <option value="36">📜 История</option>
+                    <option value="27">😱 Ужасы</option>
+                    <option value="10402">🎵 Музыка</option>
+                    <option value="9648">🔍 Детектив</option>
+                    <option value="10749">💕 Мелодрама</option>
+                    <option value="878">🚀 Фантастика</option>
+                    <option value="53">🔪 Триллер</option>
+                    <option value="10752">⚔️ Военный</option>
+                    <option value="37">🤠 Вестерн</option>
                 </select>
             </div>
-
-            <div class="filter-group exclude-group">
-                <label>Исключить темы (через запятую):</label>
-                <input type="text" id="excludeTopics" placeholder="например: насилие, депрессия, политика">
+            
+            <!-- ЭЛЕМЕНТ 3: Исключение тем -->
+            <div class="filter-group">
+                <label>🚫 Исключить темы:</label>
+                <input type="text" id="excludeKeywords" placeholder="война, депрессия, насилие">
+                <small>Через запятую</small>
             </div>
-
-            <button id="searchBtn">🔍 Искать фильмы</button>
+            
+            <!-- ЭЛЕМЕНТ 4: Кнопка поиска -->
+            <button id="searchBtn">🔍 Искать фильм</button>
         </div>
-
+        
+        <!-- ДОПОЛНИТЕЛЬНЫЕ КНОПКИ УПРАВЛЕНИЯ -->
+        <div class="action-buttons">
+            <button id="clearFiltersBtn" class="secondary">🗑️ Очистить фильтры</button>
+            <button id="loadMoreBtn" class="secondary" style="display: none;">📥 Загрузить ещё</button>
+            <button id="randomMovieBtn" class="secondary">🎲 Случайный фильм</button>
+        </div>
+        
+        <!-- БЛОК РЕЗУЛЬТАТОВ -->
         <div id="results" class="results"></div>
+        
+        <!-- СТАТУС БАР -->
+        <div id="statusBar" class="status-bar"></div>
     </div>
-
+    
     <script src="script.js"></script>
 </body>
+</html>
 </html>
