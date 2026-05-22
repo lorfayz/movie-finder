@@ -1,176 +1,92 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FilmFinder - Поиск идеального фильма</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Movie Picker — подбор идеального фильма</title>
+
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <header class="header">
-        <div class="container">
-            <div class="logo">
-                <i class="fas fa-film"></i>
-                <h1>FilmFinder</h1>
-            </div>
-            <p class="tagline">Найди свой идеальный фильм</p>
-        </div>
+  <div class="page">
+    <header class="hero">
+      <div class="hero__content">
+        <p class="eyebrow">Powered by The Movie Database</p>
+        <h1>Подбери идеальный фильм</h1>
+        <p class="hero__text">
+          Выбери год, жанр и исключи темы, которые тебе неинтересны.
+          Сайт найдёт подходящие фильмы, покажет обложки, описания и рецензии.
+        </p>
+      </div>
     </header>
 
     <main class="container">
-        <section class="filters-section">
-            <div class="filters-container">
-                <div class="filter-group">
-                    <label for="year-filter">
-                        <i class="fas fa-calendar"></i> Год выпуска
-                    </label>
-                    <div class="year-range">
-                        <input type="range" id="year-from" min="1900" max="2024" value="2000" class="slider">
-                        <input type="range" id="year-to" min="1900" max="2024" value="2024" class="slider">
-                    </div>
-                    <div class="year-values">
-                        <span id="year-from-value">2000</span> - 
-                        <span id="year-to-value">2024</span>
-                    </div>
-                </div>
+      <section class="search-panel">
+        <form id="searchForm" class="form">
+          <div class="field">
+            <label for="yearInput">Год выпуска</label>
+            <input
+              id="yearInput"
+              type="number"
+              min="1888"
+              max="2035"
+              placeholder="Например: 2020"
+            />
+          </div>
 
-                <div class="filter-group">
-                    <label for="genre-filter">
-                        <i class="fas fa-theater-masks"></i> Жанры
-                    </label>
-                    <div class="genres-list" id="genres-container">
-                    </div>
-                </div>
+          <div class="field">
+            <label for="genreSelect">Жанр</label>
+            <select id="genreSelect">
+              <option value="">Любой жанр</option>
+            </select>
+          </div>
 
-                <div class="filter-group">
-                    <label for="exclude-keywords">
-                        <i class="fas fa-ban"></i> Исключить темы
-                    </label>
-                    <div class="exclude-tags" id="exclude-keywords">
-                    </div>
-                    <input 
-                        type="text" 
-                        id="keyword-input" 
-                        placeholder="Введи тему для исключения и нажми Enter..."
-                        class="keyword-input"
-                    >
-                </div>
+          <div class="field field--wide">
+            <label for="excludeInput">Исключить темы из описания</label>
+            <input
+              id="excludeInput"
+              type="text"
+              placeholder="Например: война, зомби, политика"
+            />
+            <small>
+              Укажи слова через запятую. Если они есть в описании фильма,
+              фильм будет скрыт.
+            </small>
+          </div>
 
-                <div class="filter-group">
-                    <label for="sort-by">
-                        <i class="fas fa-sort"></i> Сортировка
-                    </label>
-                    <select id="sort-by" class="select-filter">
-                        <option value="popularity.desc">По популярности (убыв.)</option>
-                        <option value="vote_average.desc">По рейтингу (убыв.)</option>
-                        <option value="release_date.desc">По дате (новые)</option>
-                        <option value="release_date.asc">По дате (старые)</option>
-                    </select>
-                </div>
+          <div class="buttons">
+            <button id="searchBtn" class="btn btn--primary" type="submit">
+              Найти фильмы
+            </button>
 
-                <div class="filter-group">
-                    <label for="rating-filter">
-                        <i class="fas fa-star"></i> Минимальный рейтинг
-                    </label>
-                    <div class="rating-slider">
-                        <input type="range" id="rating-filter" min="0" max="10" step="0.5" value="0" class="slider">
-                        <span id="rating-value">0</span> / 10
-                    </div>
-                </div>
+            <button id="resetBtn" class="btn btn--ghost" type="button">
+              Сбросить
+            </button>
+          </div>
+        </form>
+      </section>
 
-                <button id="search-btn" class="btn btn-primary">
-                    <i class="fas fa-search"></i> Найти фильмы
-                </button>
-            </div>
-        </section>
+      <section class="status-bar">
+        <div id="statusText">Выбери параметры и нажми «Найти фильмы».</div>
+      </section>
 
-        <section class="movies-section">
-            <div id="loading" class="loading hidden">
-                <div class="spinner"></div>
-                <p>Загружаю фильмы...</p>
-            </div>
+      <section id="results" class="movies-grid"></section>
 
-            <div id="no-results" class="no-results hidden">
-                <i class="fas fa-film"></i>
-                <p>Фильмы не найдены. Попробуй изменить фильтры.</p>
-            </div>
-
-            <div id="movies-grid" class="movies-grid">
-            </div>
-        </section>
+      <div class="load-more-wrap">
+        <button id="loadMoreBtn" class="btn btn--secondary hidden" type="button">
+          Показать ещё
+        </button>
+      </div>
     </main>
 
-    <div id="modal" class="modal hidden">
-        <div class="modal-content">
-            <button class="modal-close" id="modal-close">
-                <i class="fas fa-times"></i>
-            </button>
-            <div class="modal-body">
-                <div class="modal-poster">
-                    <img id="modal-poster" src="" alt="Постер">
-                </div>
-                <div class="modal-info">
-                    <h2 id="modal-title"></h2>
-                    <div class="modal-meta">
-                        <span class="badge badge-year" id="modal-year"></span>
-                        <span class="badge badge-genre" id="modal-genre"></span>
-                        <span class="badge badge-rating" id="modal-rating"></span>
-                    </div>
-                    
-                    <div class="modal-stats">
-                        <div class="stat">
-                            <i class="fas fa-star"></i>
-                            <span id="modal-vote-count"></span> оценок
-                        </div>
-                        <div class="stat">
-                            <i class="fas fa-film"></i>
-                            <span id="modal-runtime"></span>
-                        </div>
-                    </div>
+    <footer class="footer">
+      <p>
+        This product uses the TMDB API but is not endorsed or certified by TMDB.
+      </p>
+    </footer>
+  </div>
 
-                    <div class="modal-section">
-                        <h3>Описание</h3>
-                        <p id="modal-overview"></p>
-                    </div>
-
-                    <div class="modal-section">
-                        <h3>Рецензии</h3>
-                        <div id="modal-reviews" class="reviews-container">
-                        </div>
-                    </div>
-
-                    <div class="modal-section">
-                        <h3>Детали</h3>
-                        <div class="details-grid">
-                            <div>
-                                <strong>Страна:</strong>
-                                <p id="modal-country"></p>
-                            </div>
-                            <div>
-                                <strong>Язык:</strong>
-                                <p id="modal-language"></p>
-                            </div>
-                            <div>
-                                <strong>Бюджет:</strong>
-                                <p id="modal-budget"></p>
-                            </div>
-                            <div>
-                                <strong>Сборы:</strong>
-                                <p id="modal-revenue"></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <a id="modal-tmdb-link" href="#" target="_blank" class="btn btn-secondary">
-                        <i class="fas fa-external-link-alt"></i> Открыть на TMDB
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="api.js"></script>
-    <script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
