@@ -3,90 +3,75 @@ const API_BASE_URL = 'https://kinopoiskapiunofficial.tech/api';
 
 let currentPage = 1;
 let totalPages = 0;
-let currentFilters = {};
+let totalMoviesFound = 0;
+let currentFilters = {
+    yearFrom: 2010,
+    yearTo: 2024,
+    genreId: '',
+    ratingFrom: 7.0
+};
 let excludeTags = [];
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('MovieFinder инициализирован');
+    
     if (API_KEY === 'YOUR_API_KEY_HERE') {
-        showNotification('⚠️ Внимание! Необходимо получить API ключ на kinopoiskapiunofficial.tech и вставить его в код (строка 2 в script.js)', 'warning');
+        showNotification('⚠️ Внимание! Получите бесплатный API ключ на kinopoiskapiunofficial.tech и вставьте его в script.js (строка 8)', 'warning', 10000);
     }
     
-    loadExcludeTags();
+    loadExcludeTagsFromStorage();
     
-    setupEventListeners();
+    updateExcludeTagsDisplay();
 });
-function setupEventListeners() {
-    const searchBtn = document.getElementById('searchBtn');
-    if (searchBtn) {
-        searchBtn.onclick = () => searchMovies();
-    }
-    
-    const resetBtn = document.getElementById('resetBtn');
-    if (resetBtn) {
-        resetBtn.onclick = () => resetFilters();
-    }
-    
-    const addExcludeBtn = document.getElementById('addExcludeBtn');
-    if (addExcludeBtn) {
-        addExcludeBtn.onclick = () => addExcludeTag();
-    }
-    
-    document.querySelectorAll('.exclude-tag').forEach(btn => {
-        btn.onclick = () => {
-            const tag = btn.getAttribute('data-tag');
-            if (tag && !excludeTags.includes(tag)) {
-                excludeTags.push(tag);
-                saveExcludeTags();
-                updateExcludeTagsDisplay();
-            }
-        };
-    });
-    
-    const closeBtn = document.querySelector('.close');
-    if (closeBtn) {
-        closeBtn.onclick = () => closeModal();
-    }
-    
-    window.onclick = (event) => {
-        const modal = document.getElementById('reviewsModal');
-        if (event.target === modal) {
-            closeModal();
-        }
-    };
-}
 
-window.searchMovies = async function() 
+window.searchMovies = async function() {
+    console.log('▶ Выполняется поиск фильмов...');
+    
     const yearFrom = parseInt(document.getElementById('yearFrom').value) || 1890;
     const yearTo = parseInt(document.getElementById('yearTo').value) || 2026;
     const genreId = document.getElementById('genre').value;
     const ratingFrom = parseFloat(document.getElementById('ratingFrom').value) || 0;
     
     if (yearFrom > yearTo) {
-        showNotification('Ошибка: год "от" не может быть больше года "до"', 'error');
+        showNotification('❌ Ошибка: год "от" не может быть больше года "до"', 'error');
         return;
     }
     
-    currentFilters = {
-        yearFrom,
-        yearTo,
-        genreId,
-        ratingFrom
-    };
-    
+    currentFilters = { yearFrom, yearTo, genreId, ratingFrom };
     currentPage = 1;
     
-    showLoading();
+    showLoadingState();
     
     try {
-        const movies = await fetchMovies();
-        displayMovies(movies);
+        const movies = await fetchMoviesFromAPI();
+        displayMoviesInGrid(movies, false);
     } catch (error) {
         console.error('Ошибка поиска:', error);
-        showError('Не удалось загрузить фильмы. Проверьте API ключ и интернет-соединение.');
+        showNotification('❌ Не удалось загрузить фильмы. Проверьте API ключ и интернет-соединение', 'error');
+        showEmptyState();
     }
 };
 
-async function fetchMovies() {
+window.loadMoreMovies = async function() {
+    console.log('▶ Загрузка дополнительных фильмов...');
+    
+    if (currentPage >= totalPages) {
+        showNotification('📽 Это все фильмы! Больше нет', 'info');
+        return;
+    }
+    
+    currentPage++;
+    
+    try {
+        const moreMovies = await fetchMoviesFromAPI();
+        displayMoviesInGrid(moreMovies, true);
+    } catch (error) {
+        console.error('Ошибка загрузки:', error);
+        showNotification('❌ Ошибка загрузки дополнительных фильмов', 'error');
+        currentPage--;
+    }
+};
+async function fetchMoviesFromAPI() {
     const { yearFrom, yearTo, genreId, ratingFrom } = currentFilters;
     
     let url = `${API_BASE_URL}/v2.2/films?`;
@@ -106,9 +91,11 @@ async function fetchMovies() {
     }
     
     params.push(`page=${currentPage}`);
-    params.push(`order=RATING`); 
+    params.push(`order=RATING`);
     
     url += params.join('&');
+    
+    console.log('Запрос к API:', url);
     
     const response = await fetch(url, {
         method: 'GET',
@@ -127,42 +114,29 @@ async function fetchMovies() {
     
     const data = await response.json();
     totalPages = data.totalPages || 0;
+    totalMoviesFound = data.totalElements || 0;
     
-    let filteredMovies = data.items || [];
+    let movies = data.items || [];
     
+    // Фильтрация по исключаемым темам
     if (excludeTags.length > 0) {
-        filteredMovies = filteredMovies.filter(movie => {
+        const beforeCount = movies.length;
+        movies = movies.filter(movie => {
             const description = (movie.description || movie.shortDescription || '').toLowerCase();
             for (const tag of excludeTags) {
                 if (description.includes(tag.toLowerCase())) {
-                    return false; 
+                    return false;
                 }
             }
             return true;
         });
+        console.log(`Исключено ${beforeCount - movies.length} фильмов по темам: ${excludeTags.join(', ')}`);
     }
     
-    return filteredMovies;
+    return movies;
 }
 
-window.loadMore = async function() {
-    if (currentPage >= totalPages) {
-        showNotification('Это все фильмы!', 'info');
-        return;
-    }
-    
-    currentPage++;
-    
-    try {
-        const moreMovies = await fetchMovies();
-        displayMovies(moreMovies, true); 
-    } catch (error) {
-        console.error('Ошибка загрузки:', error);
-        showNotification('Ошибка загрузки дополнительных фильмов', 'error');
-    }
-};
-
-function displayMovies(movies, append = false) {
+function displayMoviesInGrid(movies, append = false) {
     const container = document.getElementById('moviesContainer');
     const resultsCount = document.getElementById('resultsCount');
     const paginationDiv = document.getElementById('pagination');
@@ -173,23 +147,19 @@ function displayMovies(movies, append = false) {
     
     if (!movies || movies.length === 0) {
         if (!append) {
-            container.innerHTML = `
-                <div class="loading-placeholder">
-                    <i class="fas fa-sad-tear"></i>
-                    <p>Фильмы не найдены. Попробуйте изменить параметры поиска.</p>
-                </div>
-            `;
+            showEmptyState();
             resultsCount.textContent = '0 фильмов';
         }
         paginationDiv.style.display = 'none';
         return;
     }
     
-    const currentCount = append ? parseInt(resultsCount.textContent.split(' ')[0]) : 0;
-    resultsCount.textContent = `${currentCount + movies.length} фильмов`;
+    const currentDisplayCount = container.children.length;
+    const newTotalCount = currentDisplayCount + movies.length;
+    resultsCount.textContent = `${newTotalCount} фильмов`;
     
     movies.forEach(movie => {
-        const movieCard = createMovieCard(movie);
+        const movieCard = createMovieCardElement(movie);
         container.appendChild(movieCard);
     });
     
@@ -200,12 +170,12 @@ function displayMovies(movies, append = false) {
     }
 }
 
-function createMovieCard(movie) {
+function createMovieCardElement(movie) {
     const card = document.createElement('div');
     card.className = 'movie-card';
-    card.setAttribute('data-movie-id', movie.kinopoiskId || movie.filmId);
     
-    const posterUrl = movie.posterUrlPreview || movie.posterUrl || 'https://via.placeholder.com/300x450?text=No+Poster';
+    const movieId = movie.kinopoiskId || movie.filmId;
+    const posterUrl = movie.posterUrlPreview || movie.posterUrl || 'https://via.placeholder.com/300x450?text=Нет+постера';
     const title = movie.nameRu || movie.nameOriginal || 'Название неизвестно';
     const year = movie.year || 'Год не указан';
     const rating = movie.ratingKinopoisk || movie.rating || '0';
@@ -213,7 +183,8 @@ function createMovieCard(movie) {
     
     card.innerHTML = `
         <div class="movie-poster">
-            <img src="${posterUrl}" alt="${title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450?text=No+Image'">
+            <img src="${posterUrl}" alt="${escapeHtml(title)}" loading="lazy" 
+                 onerror="this.src='https://via.placeholder.com/300x450?text=Изображение+недоступно'">
             <div class="movie-rating">
                 <i class="fas fa-star"></i> ${rating}
             </div>
@@ -225,8 +196,8 @@ function createMovieCard(movie) {
             </div>
             <div class="movie-description">${escapeHtml(description)}...</div>
             <div class="movie-actions">
-                <button class="review-btn" onclick="window.showReviews(${movie.kinopoiskId || movie.filmId})">
-                    <i class="fas fa-comment-dots"></i> Рецензии
+                <button class="review-btn" onclick="window.showMovieReviews(${movieId})">
+                    <i class="fas fa-comment-dots"></i> Читать рецензии
                 </button>
             </div>
         </div>
@@ -235,7 +206,9 @@ function createMovieCard(movie) {
     return card;
 }
 
-window.showReviews = async function(movieId) {
+window.showMovieReviews = async function(movieId) {
+    console.log(`▶ Загрузка рецензий для фильма ID: ${movieId}`);
+    
     const modal = document.getElementById('reviewsModal');
     const reviewsContent = document.getElementById('reviewsContent');
     
@@ -243,15 +216,15 @@ window.showReviews = async function(movieId) {
     reviewsContent.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Загрузка рецензий...</p>';
     
     try {
-        const reviews = await fetchReviews(movieId);
-        displayReviews(reviews);
+        const reviews = await fetchReviewsFromAPI(movieId);
+        displayReviewsInModal(reviews);
     } catch (error) {
         console.error('Ошибка загрузки рецензий:', error);
         reviewsContent.innerHTML = '<p class="no-reviews">❌ Не удалось загрузить рецензии</p>';
     }
 };
 
-async function fetchReviews(movieId) {
+async function fetchReviewsFromAPI(movieId) {
     const url = `${API_BASE_URL}/v2.2/films/${movieId}/reviews`;
     
     const response = await fetch(url, {
@@ -270,7 +243,7 @@ async function fetchReviews(movieId) {
     return data.items || [];
 }
 
-function displayReviews(reviews) {
+function displayReviewsInModal(reviews) {
     const reviewsContent = document.getElementById('reviewsContent');
     
     if (!reviews || reviews.length === 0) {
@@ -285,68 +258,54 @@ function displayReviews(reviews) {
         reviewDiv.className = 'review-item';
         reviewDiv.innerHTML = `
             <div class="review-author">
-                <i class="fas fa-user"></i> ${escapeHtml(review.author || 'Аноним')}
-                ${review.type ? `<span style="color: #6366f1; margin-left: 10px;">(${review.type})</span>` : ''}
+                <i class="fas fa-user"></i> ${escapeHtml(review.author || 'Анонимный зритель')}
+                ${review.type ? `<span style="color: #6366f1; margin-left: 10px; font-size: 12px;">(${review.type})</span>` : ''}
             </div>
-            <div class="review-text">${escapeHtml(review.title ? review.title + ': ' : '')}${escapeHtml(review.description || review.review || 'Нет текста рецензии')}</div>
+            <div class="review-text">${escapeHtml(review.title ? review.title + ': ' : '')}${escapeHtml(review.description || review.review || 'Текст рецензии отсутствует')}</div>
         `;
         reviewsContent.appendChild(reviewDiv);
     });
 }
 
-function addExcludeTag() {
+window.closeReviewsModal = function() {
+    const modal = document.getElementById('reviewsModal');
+    modal.style.display = 'none';
+};
+
+window.addQuickExcludeTag = function(tag) {
+    console.log(`▶ Добавление тега исключения: ${tag}`);
+    
+    if (!excludeTags.includes(tag)) {
+        excludeTags.push(tag);
+        saveExcludeTagsToStorage();
+        updateExcludeTagsDisplay();
+        showNotification(`✓ Добавлено исключение: "${tag}"`, 'success', 2000);
+    } else {
+        showNotification(`⚠ Тег "${tag}" уже в списке исключений`, 'warning', 1500);
+    }
+};
+
+window.addCustomExcludeTag = function() {
     const customInput = document.getElementById('customExclude');
     const newTag = customInput.value.trim().toLowerCase();
     
-    if (newTag && !excludeTags.includes(newTag)) {
-        excludeTags.push(newTag);
-        saveExcludeTags();
-        updateExcludeTagsDisplay();
-        customInput.value = '';
-    } else if (excludeTags.includes(newTag)) {
-        showNotification('Этот тег уже добавлен', 'warning');
-    }
-}
-
-function removeExcludeTag(tag) {
-    excludeTags = excludeTags.filter(t => t !== tag);
-    saveExcludeTags();
-    updateExcludeTagsDisplay();
-}
-
-function updateExcludeTagsDisplay() {
-    const container = document.getElementById('activeExcludesList');
+    console.log(`▶ Добавление пользовательского тега: ${newTag}`);
     
-    if (excludeTags.length === 0) {
-        container.innerHTML = '<span style="color: #94a3b8;">Нет активных исключений</span>';
+    if (!newTag) {
+        showNotification('⚠ Введите текст для исключения', 'warning');
         return;
     }
     
-    container.innerHTML = excludeTags.map(tag => `
-        <span class="exclude-badge" onclick="window.removeExcludeTag('${tag}')">
-            ${tag} ✕
-        </span>
-    `).join('');
-}
-
-function saveExcludeTags() {
-    localStorage.setItem('excludeTags', JSON.stringify(excludeTags));
-}
-
-function loadExcludeTags() {
-    const saved = localStorage.getItem('excludeTags');
-    if (saved) {
-        try {
-            excludeTags = JSON.parse(saved);
-            updateExcludeTagsDisplay();
-        } catch (e) {
-            console.error('Ошибка загрузки тегов:', e);
-        }
+    if (newTag.length < 2) {
+        showNotification('⚠ Тема должна содержать минимум 2 символа', 'warning');
+        return;
     }
-}
-
-window.resetFilters = function() {
-    document.getElementById('yearFrom').value = '2010';
-    document.getElementById('yearTo').value = '2024';
-    document.getElementById('genre').value = '';
-    document.getElementById('
+    
+    if (!excludeTags.includes(newTag)) {
+        excludeTags.push(newTag);
+        saveExcludeTagsToStorage();
+        updateExcludeTagsDisplay();
+        customInput.value = '';
+        showNotification(`✓ Добавлено исключение: "${newTag}"`, 'success', 2000);
+    } else {
+        showNotification(`⚠ Тема "${newTag}" уже в списке исключений`, 'warning',
