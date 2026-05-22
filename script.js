@@ -1,5 +1,5 @@
 const TMDB_API_KEY = 'f6cd8b128495cd6bb3ab36b3c8877464';
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_BASE_URL = 'https://api.themoviedb.org';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
 
 let currentPage = 1;
