@@ -1,92 +1,48 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <title>Movie Picker — подбор идеального фильма</title>
-
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Идеальный фильм - поиск по году и жанру</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="page">
-    <header class="hero">
-      <div class="hero__content">
-        <p class="eyebrow">Powered by The Movie Database</p>
-        <h1>Подбери идеальный фильм</h1>
-        <p class="hero__text">
-          Выбери год, жанр и исключи темы, которые тебе неинтересны.
-          Сайт найдёт подходящие фильмы, покажет обложки, описания и рецензии.
-        </p>
-      </div>
-    </header>
-
-    <main class="container">
-      <section class="search-panel">
-        <form id="searchForm" class="form">
-          <div class="field">
-            <label for="yearInput">Год выпуска</label>
-            <input
-              id="yearInput"
-              type="number"
-              min="1888"
-              max="2035"
-              placeholder="Например: 2020"
-            />
-          </div>
-
-          <div class="field">
-            <label for="genreSelect">Жанр</label>
-            <select id="genreSelect">
-              <option value="">Любой жанр</option>
-            </select>
-          </div>
-
-          <div class="field field--wide">
-            <label for="excludeInput">Исключить темы из описания</label>
-            <input
-              id="excludeInput"
-              type="text"
-              placeholder="Например: война, зомби, политика"
-            />
-            <small>
-              Укажи слова через запятую. Если они есть в описании фильма,
-              фильм будет скрыт.
-            </small>
-          </div>
-
-          <div class="buttons">
-            <button id="searchBtn" class="btn btn--primary" type="submit">
-              Найти фильмы
-            </button>
-
-            <button id="resetBtn" class="btn btn--ghost" type="button">
-              Сбросить
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section class="status-bar">
-        <div id="statusText">Выбери параметры и нажми «Найти фильмы».</div>
-      </section>
-
-      <section id="results" class="movies-grid"></section>
-
-      <div class="load-more-wrap">
-        <button id="loadMoreBtn" class="btn btn--secondary hidden" type="button">
-          Показать ещё
-        </button>
-      </div>
-    </main>
-
-    <footer class="footer">
-      <p>
-        This product uses the TMDB API but is not endorsed or certified by TMDB.
-      </p>
-    </footer>
-  </div>
-
-  <script src="app.js"></script>
+    <div class="container">
+        <h1>🎬 Найди идеальный фильм</h1>
+        
+        <div class="filters">
+            <div class="filter-group">
+                <label>Год выпуска:</label>
+                <select id="year"></select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Жанр:</label>
+                <select id="genre">
+                    <option value="">Любой</option>
+                    <option value="1">Комедия</option>
+                    <option value="2">Драма</option>
+                    <option value="3">Боевик</option>
+                    <option value="4">Триллер</option>
+                    <option value="5">Фантастика</option>
+                    <option value="6">Ужасы</option>
+                    <option value="7">Мелодрама</option>
+                    <option value="8">Детектив</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Исключить темы в описании:</label>
+                <input type="text" id="excludeKeywords" placeholder="война, депрессия, насилие">
+                <small>Через запятую</small>
+            </div>
+            
+            <button id="searchBtn">🔍 Искать фильм</button>
+        </div>
+        
+        <div id="results" class="results"></div>
+    </div>
+    
+    <script src="script.js"></script>
 </body>
 </html>
