@@ -1,10 +1,5 @@
-// ======================================================
-// 1. НАСТРОЙКИ API
-// ======================================================
 
-// Вставь сюда свой TMDB API Key.
-// Получить можно здесь: https://www.themoviedb.org/settings/api
-const TMDB_API_KEY = "ВСТАВЬ_СЮДА_TMDB_API_KEY";
+const TMDB_API_KEY = "f6cd8b128495cd6bb3ab36b3c8877464";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_IMAGE_URL = "https://image.tmdb.org/t/p/w500";
