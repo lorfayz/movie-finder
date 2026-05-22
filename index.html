@@ -14,48 +14,46 @@
 
 <div class="container">
     <header>
-        <h1><i class="fas fa-film"></i> MovieFinder</h1>
+        <h1><i class="fas fa-film"></i> КиноФильтр</h1>
         <p>Найди фильм, который понравится именно тебе — без скучных тем</p>
+        <p style="font-size: 0.8rem; opacity: 0.7;">🎬 Данные от TMDB</p>
     </header>
 
     <div class="search-card">
         <div class="filters-row">
-
             <div class="filter-group">
-                <label for="yearInput">
-                    <i class="fas fa-calendar-alt"></i> Год выпуска
-                </label>
-                <input
-                    type="number"
-                    id="yearInput"
-                    placeholder="2023"
-                    value="2023"
-                    min="1890"
-                    max="2030"
-                >
+                <label><i class="fas fa-calendar-alt"></i> Год выпуска</label>
+                <input type="number" id="yearInput" placeholder="2023" value="2023" min="1890" max="2030">
             </div>
 
             <div class="filter-group">
-                <label for="genreSelect">
-                    <i class="fas fa-tags"></i> Жанр
-                </label>
+                <label><i class="fas fa-tags"></i> Жанр</label>
                 <select id="genreSelect">
                     <option value="">Любой жанр</option>
-                    <option value="боевик">Боевик</option>
-                    <option value="триллер">Триллер</option>
-                    <option value="драма">Драма</option>
-                    <option value="комедия">Комедия</option>
-                    <option value="фантастика">Фантастика</option>
-                    <option value="ужасы">Ужасы</option>
-                    <option value="мелодрама">Мелодрама</option>
-                    <option value="детектив">Детектив</option>
-                    <option value="приключения">Приключения</option>
+                    <option value="28">Боевик</option>
+                    <option value="12">Приключения</option>
+                    <option value="16">Анимация</option>
+                    <option value="35">Комедия</option>
+                    <option value="80">Криминал</option>
+                    <option value="99">Документальный</option>
+                    <option value="18">Драма</option>
+                    <option value="10751">Семейный</option>
+                    <option value="14">Фэнтези</option>
+                    <option value="36">История</option>
+                    <option value="27">Ужасы</option>
+                    <option value="10402">Музыка</option>
+                    <option value="9648">Детектив</option>
+                    <option value="10749">Мелодрама</option>
+                    <option value="878">Фантастика</option>
+                    <option value="10770">ТВ фильм</option>
+                    <option value="53">Триллер</option>
+                    <option value="10752">Военный</option>
+                    <option value="37">Вестерн</option>
                 </select>
             </div>
 
             <div class="filter-group exclude-group">
                 <label><i class="fas fa-ban"></i> Исключить темы</label>
-
                 <div class="exclude-tags">
                     <span class="exclude-tag" data-tag="насилие">🚫 насилие</span>
                     <span class="exclude-tag" data-tag="кровь">🩸 кровь</span>
@@ -63,34 +61,25 @@
                     <span class="exclude-tag" data-tag="депрессия">😔 депрессия</span>
                     <span class="exclude-tag" data-tag="ужасы">👻 хоррор-сцены</span>
                     <span class="exclude-tag" data-tag="политика">🏛️ политика</span>
+                    <span class="exclude-tag" data-tag="война">⚔️ война</span>
                 </div>
-
                 <div class="exclude-input-wrapper">
-                    <input
-                        type="text"
-                        id="customExclude"
-                        placeholder="или своя тема..."
-                    >
+                    <input type="text" id="customExclude" placeholder="или своя тема...">
                     <button id="addExcludeBtn" class="small-btn">+</button>
                 </div>
-
                 <div class="active-excludes" id="activeExcludes"></div>
             </div>
-
         </div>
 
-        <button id="searchBtn" class="search-btn">
-            <i class="fas fa-search"></i> Найти идеальный фильм
-        </button>
+        <button id="searchBtn" class="search-btn"><i class="fas fa-search"></i> Найти идеальный фильм</button>
     </div>
 
     <div id="loadingIndicator" class="loading hidden">
         <div class="spinner"></div>
-        <p>Ищем в базе Кинопоиска...</p>
+        <p>Ищем в базе TMDB...</p>
     </div>
 
     <div id="resultsContainer" class="results-grid"></div>
-
     <div id="errorMessage" class="error-message hidden"></div>
 </div>
 
