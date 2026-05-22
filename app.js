@@ -1,397 +1,510 @@
-const appState = {
-    allGenres: [],
-    selectedGenres: [],
-    excludedKeywords: [],
-    currentMovies: [],
-    filters: {
-        yearFrom: 2000,
-        yearTo: 2024,
-        genres: [],
-        sortBy: 'popularity.desc',
-        minRating: 0
+// ======================================================
+// 1. НАСТРОЙКИ API
+// ======================================================
+
+// Вставь сюда свой TMDB API Key.
+// Получить можно здесь: https://www.themoviedb.org/settings/api
+const TMDB_API_KEY = "ВСТАВЬ_СЮДА_TMDB_API_KEY";
+
+const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const TMDB_IMAGE_URL = "https://image.tmdb.org/t/p/w500";
+
+
+// ======================================================
+// 2. DOM-ЭЛЕМЕНТЫ
+// ======================================================
+
+const searchForm = document.getElementById("searchForm");
+const yearInput = document.getElementById("yearInput");
+const genreSelect = document.getElementById("genreSelect");
+const excludeInput = document.getElementById("excludeInput");
+
+const searchBtn = document.getElementById("searchBtn");
+const resetBtn = document.getElementById("resetBtn");
+const loadMoreBtn = document.getElementById("loadMoreBtn");
+
+const statusText = document.getElementById("statusText");
+const results = document.getElementById("results");
+
+
+// ======================================================
+// 3. СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+// ======================================================
+
+let currentPage = 1;
+let totalPages = 1;
+let lastSearchParams = null;
+let genresMap = new Map();
+
+
+// ======================================================
+// 4. УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ЗАПРОСА К TMDB
+// ======================================================
+
+async function tmdbRequest(path, params = {}) {
+  if (!TMDB_API_KEY || TMDB_API_KEY === "ВСТАВЬ_СЮДА_TMDB_API_KEY") {
+    throw new Error("Не указан TMDB API Key. Вставь ключ в app.js.");
+  }
+
+  const url = new URL(`${TMDB_BASE_URL}${path}`);
+
+  url.searchParams.set("api_key", TMDB_API_KEY);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, value);
     }
-};
+  });
 
+  const response = await fetch(url);
 
-const DOM = {
-    yearFrom: document.getElementById('year-from'),
-    yearTo: document.getElementById('year-to'),
-    yearFromValue: document.getElementById('year-from-value'),
-    yearToValue: document.getElementById('year-to-value'),
-    genresContainer: document.getElementById('genres-container'),
-    keywordInput: document.getElementById('keyword-input'),
-    excludeKeywordsContainer: document.getElementById('exclude-keywords'),
-    sortBy: document.getElementById('sort-by'),
-    ratingFilter: document.getElementById('rating-filter'),
-    ratingValue: document.getElementById('rating-value'),
-    searchBtn: document.getElementById('search-btn'),
+  if (!response.ok) {
+    throw new Error(`Ошибка TMDB API: ${response.status}`);
+  }
 
-    moviesGrid: document.getElementById('movies-grid'),
-    loading: document.getElementById('loading'),
-    noResults: document.getElementById('no-results'),
-
-    modal: document.getElementById('modal'),
-    modalClose: document.getElementById('modal-close'),
-    modalPoster: document.getElementById('modal-poster'),
-    modalTitle: document.getElementById('modal-title'),
-    modalYear: document.getElementById('modal-year'),
-    modalGenre: document.getElementById('modal-genre'),
-    modalRating: document.getElementById('modal-rating'),
-    modalOverview: document.getElementById('modal-overview'),
-    modalReviews: document.getElementById('modal-reviews'),
-    modalVoteCount: document.getElementById('modal-vote-count'),
-    modalRuntime: document.getElementById('modal-runtime'),
-    modalCountry: document.getElementById('modal-country'),
-    modalLanguage: document.getElementById('modal-language'),
-    modalBudget: document.getElementById('modal-budget'),
-    modalRevenue: document.getElementById('modal-revenue'),
-    modalTmdbLink: document.getElementById('modal-tmdb-link')
-};
-
-async function initApp() {
-    console.log('🎬 Инициализация FilmFinder...');
-    
- 
-    appState.allGenres = await fetchGenres();
-    renderGenres();
-
-
-    attachEventListeners();
-
-    console.log('✅ FilmFinder готов к работе');
+  return response.json();
 }
 
-function attachEventListeners() {
 
-    DOM.searchBtn.addEventListener('click', handleSearch);
+// ======================================================
+// 5. ЗАГРУЗКА ЖАНРОВ
+// ======================================================
 
-    DOM.yearFrom.addEventListener('input', updateYearValues);
-    DOM.yearTo.addEventListener('input', updateYearValues);
+async function loadGenres() {
+  try {
+    setStatus("Загружаем жанры...");
 
-    DOM.sortBy.addEventListener('change', updateFilters);
-    DOM.ratingFilter.addEventListener('input', updateRatingValue);
-
-    DOM.keywordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            addExcludedKeyword();
-        }
+    const data = await tmdbRequest("/genre/movie/list", {
+      language: "ru-RU"
     });
 
-    DOM.modalClose.addEventListener('click', closeModal);
-    DOM.modal.addEventListener('click', (e) => {
-        if (e.target === DOM.modal) {
-            closeModal();
-        }
+    genreSelect.innerHTML = `<option value="">Любой жанр</option>`;
+
+    data.genres.forEach((genre) => {
+      genresMap.set(genre.id, genre.name);
+
+      const option = document.createElement("option");
+      option.value = genre.id;
+      option.textContent = genre.name;
+
+      genreSelect.appendChild(option);
     });
 
-    console.log('✅ Слушатели событий установлены');
+    setStatus("Выбери параметры и нажми «Найти фильмы».");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message);
+  }
 }
 
-function renderGenres() {
-    DOM.genresContainer.innerHTML = '';
-    appState.allGenres.forEach(genre => {
-        const btn = document.createElement('button');
-        btn.className = 'genre-btn';
-        btn.textContent = genre.name;
-        btn.dataset.id = genre.id;
-        
-        btn.addEventListener('click', () => toggleGenre(genre.id, btn));
-        
-        DOM.genresContainer.appendChild(btn);
+
+// ======================================================
+// 6. ПРИВЯЗКА КНОПКИ «НАЙТИ ФИЛЬМЫ»
+// ======================================================
+//
+// Кнопка «Найти фильмы» находится внутри формы.
+// Поэтому событие submit формы запускает функцию searchMovies().
+
+searchForm.addEventListener("submit", function (event) {
+  event.preventDefault();
+
+  currentPage = 1;
+  results.innerHTML = "";
+
+  const params = getSearchParams();
+  lastSearchParams = params;
+
+  searchMovies(params, false);
+});
+
+
+// ======================================================
+// 7. ПРИВЯЗКА КНОПКИ «СБРОСИТЬ»
+// ======================================================
+//
+// resetBtn отвечает за очистку формы, результатов и состояния.
+
+resetBtn.addEventListener("click", function () {
+  searchForm.reset();
+
+  currentPage = 1;
+  totalPages = 1;
+  lastSearchParams = null;
+
+  results.innerHTML = "";
+  loadMoreBtn.classList.add("hidden");
+
+  setStatus("Фильтры сброшены. Выбери параметры заново.");
+});
+
+
+// ======================================================
+// 8. ПРИВЯЗКА КНОПКИ «ПОКАЗАТЬ ЕЩЁ»
+// ======================================================
+//
+// loadMoreBtn догружает следующую страницу фильмов из TMDB.
+
+loadMoreBtn.addEventListener("click", function () {
+  if (!lastSearchParams) return;
+
+  currentPage += 1;
+  searchMovies(lastSearchParams, true);
+});
+
+
+// ======================================================
+// 9. ДЕЛЕГИРОВАНИЕ КНОПОК «РЕЦЕНЗИИ»
+// ======================================================
+//
+// У каждой карточки фильма есть кнопка с data-action="reviews".
+// Вместо отдельного обработчика на каждую кнопку используем один общий
+// обработчик клика на контейнере results.
+
+results.addEventListener("click", function (event) {
+  const button = event.target.closest('[data-action="reviews"]');
+
+  if (!button) return;
+
+  const movieId = button.dataset.movieId;
+  const panel = document.getElementById(`reviews-${movieId}`);
+
+  toggleReviews(movieId, button, panel);
+});
+
+
+// ======================================================
+// 10. ПОЛУЧЕНИЕ ПАРАМЕТРОВ ПОИСКА
+// ======================================================
+
+function getSearchParams() {
+  return {
+    year: yearInput.value.trim(),
+    genre: genreSelect.value,
+    excludedTopics: parseExcludedTopics(excludeInput.value)
+  };
+}
+
+
+// ======================================================
+// 11. ОБРАБОТКА ИСКЛЮЧАЕМЫХ ТЕМ
+// ======================================================
+//
+// Пользователь вводит:
+// война, зомби, политика
+//
+// Получаем массив:
+// ["война", "зомби", "политика"]
+
+function parseExcludedTopics(value) {
+  return value
+    .split(",")
+    .map((topic) => topic.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+
+// ======================================================
+// 12. ПОИСК ФИЛЬМОВ
+// ======================================================
+
+async function searchMovies(params, append = false) {
+  try {
+    searchBtn.disabled = true;
+    loadMoreBtn.disabled = true;
+
+    setStatus("Ищем подходящие фильмы...");
+
+    const data = await tmdbRequest("/discover/movie", {
+      language: "ru-RU",
+      sort_by: "popularity.desc",
+      include_adult: false,
+      include_video: false,
+      page: currentPage,
+      primary_release_year: params.year,
+      with_genres: params.genre,
+      "vote_count.gte": 30
     });
-}
 
+    totalPages = Math.min(data.total_pages, 500);
 
-function toggleGenre(genreId, btn) {
-    const index = appState.selectedGenres.indexOf(genreId);
-    
-    if (index > -1) {
-        appState.selectedGenres.splice(index, 1);
-        btn.classList.remove('active');
-    } else {
-        appState.selectedGenres.push(genreId);
-        btn.classList.add('active');
-    }
-
-    appState.filters.genres = appState.selectedGenres;
-    console.log('🎬 Выбранные жанры:', appState.selectedGenres);
-}
-
-
-function updateYearValues() {
-    let valueFrom = parseInt(DOM.yearFrom.value);
-    let valueTo = parseInt(DOM.yearTo.
-    if (valueFrom > valueTo) {
-        [valueFrom, valueTo] = [valueTo, valueFrom];
-        DOM.yearFrom.value = valueFrom;
-        DOM.yearTo.value = valueTo;
-    }
-
-    DOM.yearFromValue.textContent = valueFrom;
-    DOM.yearToValue.textContent = valueTo;
-
-    appState.filters.yearFrom = valueFrom;
-    appState.filters.yearTo = valueTo;
-
-    console.log(`📅 Год: ${valueFrom} - ${valueTo}`);
-}
-function addExcludedKeyword() {
-    const keyword = DOM.keywordInput.value.trim().toLowerCase();
-
-    if (!keyword) return;
-    if (appState.excludedKeywords.includes(keyword)) {
-        alert('Это слово уже добавлено!');
-        return;
-    }
-
-    appState.excludedKeywords.push(keyword);
-    DOM.keywordInput.value = '';
-    renderExcludedKeywords();
-
-    console.log('🚫 Исключённые слова:', appState.excludedKeywords);
-}
-
-function renderExcludedKeywords() {
-    DOM.excludeKeywordsContainer.innerHTML = '';
-    appState.excludedKeywords.forEach(keyword => {
-        const tag = document.createElement('div');
-        tag.className = 'tag';
-        tag.innerHTML = `
-            ${keyword}
-            <button type="button" title="Удалить">×</button>
-        `;
-
-        tag.querySelector('button').addEventListener('click', () => {
-            removeExcludedKeyword(keyword);
-        });
-
-        DOM.excludeKeywordsContainer.appendChild(tag);
-    });
-}
-
-function removeExcludedKeyword(keyword) {
-    appState.excludedKeywords = appState.excludedKeywords.filter(k => k !== keyword);
-    renderExcludedKeywords();
-    console.log('🚫 Слово удалено:', keyword);
-}
-
-function containsExcludedKeywords(text) {
-    if (!text) return false;
-    const lowerText = text.toLowerCase();
-    return appState.excludedKeywords.some(keyword => 
-        lowerText.includes(keyword)
+    const filteredMovies = filterMoviesByExcludedTopics(
+      data.results,
+      params.excludedTopics
     );
-}
 
- * Отфильтровать фильмы по исключённым словам
- * ПРИВЯЗКА: handleSearch() → f
-function filterMoviesByKeywords(movies) {
-    return movies.filter(movie => {
-        const overview = movie.overview || '';
-        const title = movie.title || '';
-        
-        return !containsExcludedKeywords(overview) && 
-               !containsExcludedKeywords(title);
-    });
-}
-
-function updateRatingValue() {
-    const value = DOM.ratingFilter.value;
-    DOM.ratingValue.textContent = value;
-    appState.filters.minRating = parseFloat(value);
-    console.log('⭐ Минимальный рейтинг:', appState.filters.minRating);
-}
-
-function updateFilters() {
-    appState.filters.sortBy = DOM.sortBy.value;
-    console.log('🔄 Сортировка:', appState.filters.sortBy);
-}
-
-async function handleSearch() {
-    console.log('🔍 Начинаю поиск с фильтрами:', appState.filters);
-
-    showLoading();
-
-    try {
-        const movies = await searchMovies(appState.filters);
-        console.log(`📽️ Найдено фильмов: ${movies.length}`);
-
-        const filtered = filterMoviesByKeywords(movies);
-        console.log(`✅ После фильтрации по словам: ${filtered.length}`);
-
-        appState.currentMovies = filtered;
-
-        renderMovies(filtered);
-
-    } catch (error) {
-        console.error('❌ Ошибка при поиске:', error);
-    } finally {
-        hideLoading();
-    }
-}
-
-function renderMovies(movies) {
-    DOM.moviesGrid.innerHTML = '';
-
-    if (movies.length === 0) {
-        DOM.noResults.classList.remove('hidden');
-        return;
+    if (!append && filteredMovies.length === 0) {
+      results.innerHTML = "";
     }
 
-    DOM.noResults.classList.add('hidden');
+    renderMovies(filteredMovies, append);
 
-    movies.forEach(movie => {
-        const card = createMovieCard(movie);
-        DOM.moviesGrid.appendChild(card);
+    updateLoadMoreButton();
 
-        // Привязать клик к карточке
-        card.addEventListener('click', () => openMovieModal(movie.id));
-    });
-
-    console.log(`🎬 Отрендерено ${movies.length} фильмов`);
+    if (filteredMovies.length === 0) {
+      setStatus(
+        "На этой странице подходящих фильмов не найдено. Попробуй другой год, жанр или убери часть исключений."
+      );
+    } else {
+      setStatus(
+        `Найдено фильмов на странице: ${filteredMovies.length}. Страница ${currentPage} из ${totalPages}.`
+      );
+    }
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message);
+  } finally {
+    searchBtn.disabled = false;
+    loadMoreBtn.disabled = false;
+  }
 }
+
+
+// ======================================================
+// 13. ФИЛЬТРАЦИЯ ПО НЕЖЕЛАТЕЛЬНЫМ ТЕМАМ
+// ======================================================
+//
+// Проверяем название и описание фильма.
+// Если там есть запрещённое слово — фильм исключается.
+
+function filterMoviesByExcludedTopics(movies, excludedTopics) {
+  if (!excludedTopics.length) {
+    return movies;
+  }
+
+  return movies.filter((movie) => {
+    const text = `${movie.title || ""} ${movie.overview || ""}`.toLowerCase();
+
+    return !excludedTopics.some((topic) => text.includes(topic));
+  });
+}
+
+
+// ======================================================
+// 14. ОТРИСОВКА ФИЛЬМОВ
+// ======================================================
+
+function renderMovies(movies, append) {
+  if (!append) {
+    results.innerHTML = "";
+  }
+
+  const html = movies.map(createMovieCard).join("");
+
+  results.insertAdjacentHTML("beforeend", html);
+}
+
+
+// ======================================================
+// 15. СОЗДАНИЕ HTML-КАРТОЧКИ ФИЛЬМА
+// ======================================================
 
 function createMovieCard(movie) {
-    const card = document.createElement('div');
-    card.className = 'movie-card';
-    card.style.cursor = 'pointer';
+  const poster = movie.poster_path
+    ? `${TMDB_IMAGE_URL}${movie.poster_path}`
+    : "";
 
-    const genreNames = (movie.genre_ids || [])
-        .map(id => {
-            const genre = appState.allGenres.find(g => g.id === id);
-            return genre ? genre.name : '';
-        })
-        .filter(Boolean);
+  const year = movie.release_date
+    ? movie.release_date.slice(0, 4)
+    : "Год неизвестен";
 
-    const posterHTML = movie.poster_path
-        ? `<img src="${IMG_BASE_URL}${movie.poster_path}" alt="${movie.title}" loading="lazy">`
-        : '<div class="movie-no-image"><i class="fas fa-image"></i></div>';
+  const rating = movie.vote_average
+    ? movie.vote_average.toFixed(1)
+    : "—";
 
-    const rating = (movie.vote_average || 0).toFixed(1);
-    const ratingColor = rating >= 7 ? 'var(--success-color)' : 
-                       rating >= 5 ? 'var(--warning-color)' : 
-                       'var(--primary-color)';
+  const genres = movie.genre_ids
+    .map((id) => genresMap.get(id))
+    .filter(Boolean)
+    .slice(0, 3);
 
-    card.innerHTML = `
-        <div class="movie-poster">
-            ${posterHTML}
-            <div class="movie-rating-badge" style="background: ${ratingColor}">
-                ⭐ ${rating}
-            </div>
+  const overview = movie.overview
+    ? movie.overview
+    : "Описание для этого фильма отсутствует.";
+
+  return `
+    <article class="movie-card">
+      <div class="movie-poster">
+        ${
+          poster
+            ? `<img src="${poster}" alt="${escapeHtml(movie.title)}">`
+            : ""
+        }
+        <div class="rating">★ ${rating}</div>
+      </div>
+
+      <div class="movie-body">
+        <h2 class="movie-title">${escapeHtml(movie.title)}</h2>
+
+        <div class="meta">
+          <span class="badge">${year}</span>
+          ${genres.map((genre) => `<span class="badge">${escapeHtml(genre)}</span>`).join("")}
         </div>
-        <div class="movie-info">
-            <h3 class="movie-title">${movie.title}</h3>
-            <div class="movie-meta">
-                <span class="movie-year">${movie.release_date ? movie.release_date.split('-')[0] : 'N/A'}</span>
-                <span class="movie-stars">⭐ ${rating}</span>
-            </div>
-            <p class="movie-description">${movie.overview ? movie.overview.substring(0, 100) + '...' : 'Описание недоступно'}</p>
-            <div class="movie-genres">
-                ${genreNames.slice(0, 3).map(genre => 
-                    `<span class="genre-badge">${genre}</span>`
-                ).join('')}
-            </div>
+
+        <p class="overview">${escapeHtml(overview)}</p>
+
+        <div class="card-actions">
+          <button
+            class="btn btn--ghost"
+            type="button"
+            data-action="reviews"
+            data-movie-id="${movie.id}"
+          >
+            Показать рецензии
+          </button>
         </div>
-    `;
 
-    return card;
-}
-
-async function openMovieModal(movieId) {
-    console.log('📖 Открываю модальное окно для фильма:', movieId);
-
-    DOM.modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-
-    const [details, reviews] = await Promise.all([
-        fetchMovieDetails(movieId),
-        fetchMovieReviews(movieId)
-    ]);
-
-    if (!details) return;
-
-    populateModal(details, reviews);
+        <div id="reviews-${movie.id}" class="review-panel"></div>
+      </div>
+    </article>
+  `;
 }
 
 
-function populateModal(details, reviews) {
-    const year = details.release_date ? details.release_date.split('-')[0] : 'N/A';
-    const rating = (details.vote_average || 0).toFixed(1);
-    const genres = details.genres.map(g => g.name).join(', ');
-    const runtime = details.runtime ? `${details.runtime} мин` : 'N/A';
+// ======================================================
+// 16. ПОКАЗ И СКРЫТИЕ РЕЦЕНЗИЙ
+// ======================================================
 
+async function toggleReviews(movieId, button, panel) {
+  const isOpen = panel.classList.contains("open");
 
-    DOM.modalPoster.src = details.poster_path 
-        ? `${IMG_LARGE_URL}${details.poster_path}`
-        : 'https://via.placeholder.com/500x750?text=No+Image';
-    
-    DOM.modalTitle.textContent = details.title;
-    DOM.modalYear.textContent = year;
-    DOM.modalGenre.textContent = genres || 'Неизвестно';
-    DOM.modalRating.textContent = `${rating} / 10`;
-    DOM.modalOverview.textContent = details.overview || 'Описание недоступно';
-    DOM.modalVoteCount.textContent = (details.vote_count || 0).toLocaleString();
-    DOM.modalRuntime.textContent = runtime;
+  if (isOpen) {
+    panel.classList.remove("open");
+    button.textContent = "Показать рецензии";
+    return;
+  }
 
-    const countries = (details.production_countries || [])
-        .map(c => getCountryName(c.iso_3166_1))
-        .join(', ');
-    
-    const languages = (details.spoken_languages || [])
-        .map(l => getLanguageName(l.iso_639_1))
-        .join(', ');
+  panel.classList.add("open");
+  button.textContent = "Скрыть рецензии";
 
-    DOM.modalCountry.textContent = countries || 'Неизвестно';
-    DOM.modalLanguage.textContent = languages || 'Неизвестно';
-    DOM.modalBudget.textContent = formatCurrency(details.budget);
-    DOM.modalRevenue.textContent = formatCurrency(details.revenue);
+  if (panel.dataset.loaded === "true") {
+    return;
+  }
 
-    DOM.modalTmdbLink.href = `https://www.themoviedb.org/movie/${details.id}`;
+  panel.innerHTML = `<p class="overview">Загружаем рецензии...</p>`;
 
-    renderReviews(reviews);
+  try {
+    const reviews = await loadMovieReviews(movieId);
 
-    console.log('✅ Модальное окно заполнено');
-}
-function renderReviews(reviews) {
-    DOM.modalReviews.innerHTML = '';
+    panel.dataset.loaded = "true";
 
-    if (reviews.length === 0) {
-        DOM.modalReviews.innerHTML = '<p style="color: var(--text-secondary);">Рецензии не найдены</p>';
-        return;
+    if (!reviews.length) {
+      panel.innerHTML = `
+        <p class="overview">
+          У этого фильма пока нет рецензий в TMDB.
+        </p>
+      `;
+      return;
     }
 
-    reviews.slice(0, 5).forEach(review => {
-        const reviewEl = document.createElement('div');
-        reviewEl.className = 'review';
-
-        const rating = review.author_details?.rating 
-            ? `⭐ ${review.author_details.rating} / 10`
-            : '';
-
-        reviewEl.innerHTML = `
-            <div class="review-author">👤 ${review.author}</div>
-            ${rating ? `<div class="review-rating">${rating}</div>` : ''}
-            <div class="review-text">${review.content.substring(0, 300)}...</div>
-        `;
-
-        DOM.modalReviews.appendChild(reviewEl);
-    });
+    panel.innerHTML = reviews
+      .slice(0, 3)
+      .map(createReviewHtml)
+      .join("");
+  } catch (error) {
+    console.error(error);
+    panel.innerHTML = `
+      <p class="overview">
+        Не удалось загрузить рецензии.
+      </p>
+    `;
+  }
 }
 
-function closeModal() {
-    DOM.modal.classList.add('hidden');
-    document.body.style.overflow = 'auto';
-    console.log('❌ Модальное окно закрыто');
+
+// ======================================================
+// 17. ЗАГРУЗКА РЕЦЕНЗИЙ ФИЛЬМА
+// ======================================================
+//
+// Сначала пробуем получить русскоязычные рецензии.
+// Если их нет, пробуем английские.
+
+async function loadMovieReviews(movieId) {
+  const ruData = await tmdbRequest(`/movie/${movieId}/reviews`, {
+    language: "ru-RU",
+    page: 1
+  });
+
+  if (ruData.results && ruData.results.length > 0) {
+    return ruData.results;
+  }
+
+  const enData = await tmdbRequest(`/movie/${movieId}/reviews`, {
+    language: "en-US",
+    page: 1
+  });
+
+  return enData.results || [];
 }
 
-function showLoading() {
-    DOM.loading.classList.remove('hidden');
-    DOM.moviesGrid.innerHTML = '';
-    DOM.noResults.classList.add('hidden');
+
+// ======================================================
+// 18. HTML ДЛЯ ОДНОЙ РЕЦЕНЗИИ
+// ======================================================
+
+function createReviewHtml(review) {
+  const author = review.author || "Аноним";
+  const rating = review.author_details?.rating;
+
+  const ratingText = rating
+    ? `Оценка автора: ${rating}/10`
+    : "Без оценки автора";
+
+  const content = truncateText(review.content || "", 650);
+
+  return `
+    <div class="review">
+      <strong>${escapeHtml(author)} · ${escapeHtml(ratingText)}</strong>
+      <p>${escapeHtml(content)}</p>
+      ${
+        review.url
+          ? `<a href="${review.url}" target="_blank" rel="noopener noreferrer">Читать полностью</a>`
+          : ""
+      }
+    </div>
+  `;
 }
 
-function hideLoading() {
-    DOM.loading.classList.add('hidden');
+
+// ======================================================
+// 19. УПРАВЛЕНИЕ КНОПКОЙ «ПОКАЗАТЬ ЕЩЁ»
+// ======================================================
+
+function updateLoadMoreButton() {
+  if (currentPage < totalPages) {
+    loadMoreBtn.classList.remove("hidden");
+  } else {
+    loadMoreBtn.classList.add("hidden");
+  }
 }
 
-document.addEventListener('DOMContentLoaded', initApp);
+
+// ======================================================
+// 20. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ======================================================
+
+function setStatus(message) {
+  statusText.textContent = message;
+}
+
+function truncateText(text, maxLength) {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength).trim()}...`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+// ======================================================
+// 21. ЗАПУСК ПРИЛОЖЕНИЯ
+// ======================================================
+
+loadGenres();
