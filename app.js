@@ -1,149 +1,133 @@
-const API_KEY  = '2b8b737c-2fb6-4c31-8e0c-62c9a2a1dc88';
-const API_BASE = 'https://kinopoiskapiunofficial.tech/api';
+const TMDB_API_KEY = 'f6cd8b128495cd6bb3ab36b3c8877464'; 
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 
 let excludedKeywords = new Set();
 
-const yearInput         = document.getElementById('yearInput');
-const genreSelect       = document.getElementById('genreSelect');
-const searchBtn         = document.getElementById('searchBtn');
-const resultsContainer  = document.getElementById('resultsContainer');
-const loadingIndicator  = document.getElementById('loadingIndicator');
-const errorMessageDiv   = document.getElementById('errorMessage');
-const customExcludeInput= document.getElementById('customExclude');
-const addExcludeBtn     = document.getElementById('addExcludeBtn');
+const yearInput = document.getElementById('yearInput');
+const genreSelect = document.getElementById('genreSelect');
+const searchBtn = document.getElementById('searchBtn');
+const resultsContainer = document.getElementById('resultsContainer');
+const loadingIndicator = document.getElementById('loadingIndicator');
+const errorMessageDiv = document.getElementById('errorMessage');
+const customExcludeInput = document.getElementById('customExclude');
+const addExcludeBtn = document.getElementById('addExcludeBtn');
 const activeExcludesDiv = document.getElementById('activeExcludes');
 
 document.querySelectorAll('.exclude-tag').forEach(tag => {
     tag.addEventListener('click', () => {
         const keyword = tag.getAttribute('data-tag');
-        if (keyword && !excludedKeywords.has(keyword)) {
+        if (!excludedKeywords.has(keyword)) {
             excludedKeywords.add(keyword);
             renderExcludeBadges();
         }
     });
 });
 
-addExcludeBtn.addEventListener('click', addCustomExclude);
-
-customExcludeInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') addCustomExclude();
-});
-
-function addCustomExclude() {
-    const word = customExcludeInput.value.trim().toLowerCase();
-    if (word && !excludedKeywords.has(word)) {
-        excludedKeywords.add(word);
+addExcludeBtn.addEventListener('click', () => {
+    const customWord = customExcludeInput.value.trim().toLowerCase();
+    if (customWord && !excludedKeywords.has(customWord)) {
+        excludedKeywords.add(customWord);
         renderExcludeBadges();
         customExcludeInput.value = '';
     }
-}
+});
 
 function renderExcludeBadges() {
     activeExcludesDiv.innerHTML = '';
-
     excludedKeywords.forEach(keyword => {
         const badge = document.createElement('div');
         badge.className = 'exclude-badge';
-
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'remove-exclude';
-        removeBtn.textContent = '✕';
-        removeBtn.setAttribute('aria-label', `Удалить "${keyword}"`);
-        removeBtn.addEventListener('click', () => {
-            excludedKeywords.delete(keyword);
+        badge.innerHTML = `🚫 ${keyword} <button class="remove-exclude" data-word="${keyword}">✕</button>`;
+        activeExcludesDiv.appendChild(badge);
+    });
+    
+    document.querySelectorAll('.remove-exclude').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const word = btn.getAttribute('data-word');
+            excludedKeywords.delete(word);
             renderExcludeBadges();
         });
-
-        badge.textContent = `🚫 ${keyword} `;
-        badge.appendChild(removeBtn);
-        activeExcludesDiv.appendChild(badge);
     });
 }
 
 function isDescriptionValid(description) {
     if (!description) return true;
-    const lower = description.toLowerCase();
-    for (const kw of excludedKeywords) {
-        if (lower.includes(kw)) {
-            console.log(`[фильтр] Исключено из-за слова: "${kw}"`);
+    const lowerDesc = description.toLowerCase();
+    for (let keyword of excludedKeywords) {
+        if (lowerDesc.includes(keyword)) {
+            console.log(`Исключено из-за: ${keyword}`);
             return false;
         }
     }
     return true;
 }
-
 async function searchMovies() {
-    const year  = yearInput.value.trim();
-    const genre = genreSelect.value;
-
+    const year = yearInput.value.trim();
+    const genreId = genreSelect.value;
+    
     if (!year || year < 1890 || year > 2030) {
-        showError('Введите корректный год (1890–2030)');
+        showError('Введите корректный год (1890-2030)');
         return;
     }
-
+    
     showLoading(true);
     resultsContainer.innerHTML = '';
     errorMessageDiv.classList.add('hidden');
-
+    
     try {
-        const url =
-            `${API_BASE}/v2.2/films` +
-            `?order=RATING&type=ALL&ratingFrom=1` +
-            `&yearFrom=${year}&yearTo=${year}&page=1`;
-
-        const response = await fetch(url, {
-            headers: {
-                'X-API-KEY'   : API_KEY,
-                'Content-Type': 'application/json'
-            }
-        });
-
+        let url = `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&language=ru-RU&sort_by=vote_count.desc&primary_release_year=${year}&page=1`;
+        
+        if (genreId) {
+            url += `&with_genres=${genreId}`;
+        }
+        
+        const response = await fetch(url);
+        
         if (!response.ok) {
-            if (response.status === 401)
-                throw new Error('Неверный API-ключ. Получите новый на kinopoiskapiunofficial.tech');
+            if (response.status === 401) {
+                throw new Error('Неверный API ключ TMDB. Получите бесплатный ключ на themoviedb.org');
+            }
             throw new Error(`Ошибка API: ${response.status}`);
         }
-
+        
         const data = await response.json();
-        let movies = data.items || [];
-
-        if (genre) {
-            movies = movies.filter(m =>
-                Array.isArray(m.genres) &&
-                m.genres.some(g => g.genre.toLowerCase().includes(genre.toLowerCase()))
-            );
+        let movies = data.results || [];
+        
+        if (movies.length === 0) {
+            resultsContainer.innerHTML = `<div class="error-message" style="display:block; grid-column:1/-1;">😢 Нет фильмов за ${year} год. Попробуйте другой год.</div>`;
+            showLoading(false);
+            return;
         }
-
+        
         const fullMovies = [];
-        for (const movie of movies.slice(0, 15)) {
+        for (let movie of movies.slice(0, 12)) { 
             try {
-                const details = await fetchMovieDetails(movie.filmId);
-                if (!details) continue;
-
-                if (isDescriptionValid(details.description)) {
+                const details = await fetchMovieDetails(movie.id);
+                const reviews = await fetchMovieReviews(movie.id);
+                
+                if (details && isDescriptionValid(details.overview)) {
                     fullMovies.push({
                         ...movie,
-                        description: details.description || 'Описание отсутствует',
-                        reviews    : details.reviews || []
+                        overview: details.overview || 'Описание отсутствует',
+                        vote_average: movie.vote_average || 0,
+                        reviews: reviews,
+                        release_date: movie.release_date
                     });
-                } else {
-                    console.log(`[фильтр] Пропущен: "${movie.nameRu}"`);
+                } else if (details && !isDescriptionValid(details.overview)) {
+                    console.log(`Фильм "${movie.title}" исключен по описанию`);
                 }
             } catch (err) {
-                console.warn(`Ошибка деталей id=${movie.filmId}:`, err);
+                console.warn(`Ошибка загрузки деталей фильма ${movie.id}`, err);
             }
         }
-
+        
         displayMovies(fullMovies);
-
+        
         if (fullMovies.length === 0) {
-            resultsContainer.innerHTML =
-                `<div class="error-message" style="display:block;grid-column:1/-1;">
-                    😢 Нет фильмов, подходящих под все критерии.<br>
-                    Попробуйте другой год или уберите лишние исключения.
-                 </div>`;
+            resultsContainer.innerHTML = `<div class="error-message" style="display:block; grid-column:1/-1;">😢 Нет фильмов, подходящих под все критерии. Попробуйте другой год или исключите меньше тем.</div>`;
         }
-
+        
     } catch (error) {
         console.error(error);
         showError(error.message);
@@ -152,64 +136,60 @@ async function searchMovies() {
     }
 }
 
-async function fetchMovieDetails(filmId) {
-    const resp = await fetch(`${API_BASE}/v2.2/films/${filmId}`, {
-        headers: { 'X-API-KEY': API_KEY }
-    });
+async function fetchMovieDetails(movieId) {
+    const detailUrl = `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=ru-RU`;
+    const resp = await fetch(detailUrl);
     if (!resp.ok) return null;
+    return await resp.json();
+}
 
-    const film = await resp.json();
-    const description = film.description || film.shortDescription || '';
-
-    let reviews = [];
+async function fetchMovieReviews(movieId) {
     try {
-        const revResp = await fetch(
-            `${API_BASE}/v2.2/films/${filmId}/reviews?page=1`,
-            { headers: { 'X-API-KEY': API_KEY } }
-        );
-        if (revResp.ok) {
-            const revData = await revResp.json();
-            reviews = (revData.items || []).slice(0, 1);
-        }
-    } catch (_) { /* рецензии — необязательно */ }
-
-    return { description, reviews };
+        const reviewUrl = `${TMDB_BASE_URL}/movie/${movieId}/reviews?api_key=${TMDB_API_KEY}&language=en-US&page=1`;
+        const resp = await fetch(reviewUrl);
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        return data.results || [];
+    } catch(e) {
+        console.warn('Ошибка загрузки рецензий', e);
+        return [];
+    }
 }
 
 function displayMovies(movies) {
     if (!movies.length) return;
-
+    
     resultsContainer.innerHTML = movies.map(movie => {
-        const poster  = movie.posterUrlPreview
-            || 'https://via.placeholder.com/300x400?text=Нет+постера';
-        const title   = movie.nameRu || movie.nameOriginal || 'Без названия';
-        const rating  = movie.ratingKinopoisk
-            ? `⭐ ${movie.ratingKinopoisk.toFixed(1)}`
-            : 'Нет рейтинга';
-        const desc    = movie.description || 'Описание не загружено';
-        const shortDesc = escapeHtml(desc.substring(0, 150)) + (desc.length > 150 ? '…' : '');
-
-        let reviewHtml = '📝 Рецензий пока нет';
-        if (movie.reviews && movie.reviews[0]) {
-            const rev = movie.reviews[0];
-            const revText = (rev.review || '').substring(0, 120);
-            reviewHtml = `🗣 ${escapeHtml(rev.title || 'Рецензия')}: ${escapeHtml(revText)}…`;
+        const posterUrl = movie.poster_path 
+            ? `${IMAGE_BASE_URL}${movie.poster_path}` 
+            : 'https://via.placeholder.com/300x450?text=Нет+постера';
+        
+        const title = movie.title || movie.original_title || 'Без названия';
+        const year = movie.release_date ? movie.release_date.split('-')[0] : 'N/A';
+        const rating = movie.vote_average ? `⭐ ${movie.vote_average.toFixed(1)}/10` : 'Нет рейтинга';
+        const descriptionText = movie.overview || 'Описание не загружено';
+        
+        let reviewsHtml = '';
+        if (movie.reviews && movie.reviews.length > 0) {
+            const topReview = movie.reviews[0];
+            reviewsHtml = `
+                <div class="review">
+                    <strong>✍️ ${topReview.author || 'Критик'}:</strong><br>
+                    "${topReview.content ? topReview.content.substring(0, 120) : 'Нет текста'}${topReview.content?.length > 120 ? '…' : ''}"
+                </div>
+            `;
+        } else {
+            reviewsHtml = `<div class="review">📝 Рецензий пока нет</div>`;
         }
-
+        
         return `
             <div class="movie-card">
-                <img
-                    class="movie-poster"
-                    src="${poster}"
-                    alt="${escapeHtml(title)}"
-                    loading="lazy"
-                    onerror="this.src='https://via.placeholder.com/300x400?text=Постер+недоступен'"
-                >
+                <img class="movie-poster" src="${posterUrl}" alt="${title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450?text=Постер+недоступен'">
                 <div class="movie-info">
                     <div class="movie-title">${escapeHtml(title)}</div>
-                    <div class="movie-year">${movie.year || '?'} • ${rating}</div>
-                    <div class="description">${shortDesc}</div>
-                    <div class="review">${reviewHtml}</div>
+                    <div class="movie-year">${year} • ${rating}</div>
+                    <div class="description">${escapeHtml(descriptionText.substring(0, 150))}${descriptionText.length > 150 ? '…' : ''}</div>
+                    ${reviewsHtml}
                 </div>
             </div>
         `;
@@ -218,11 +198,12 @@ function displayMovies(movies) {
 
 function escapeHtml(str) {
     if (!str) return '';
-    return String(str)
+    return str
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function showError(msg) {
@@ -234,18 +215,21 @@ function showLoading(isLoading) {
     if (isLoading) {
         loadingIndicator.classList.remove('hidden');
         searchBtn.disabled = true;
-        searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Ищем...';
     } else {
         loadingIndicator.classList.add('hidden');
         searchBtn.disabled = false;
-        searchBtn.innerHTML = '<i class="fas fa-search"></i> Найти идеальный фильм';
     }
 }
 
 searchBtn.addEventListener('click', searchMovies);
-
-yearInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') searchMovies();
+window.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && document.activeElement !== customExcludeInput) {
+        searchMovies();
+    }
 });
 
 renderExcludeBadges();
+
+if (TMDB_API_KEY === 'YOUR_TMDB_API_KEY') {
+    showError('⚠️ Пожалуйста, получите бесплатный API ключ на themoviedb.org и вставьте его в script.js (TMDB_API_KEY)');
+}
