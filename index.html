@@ -66,16 +66,16 @@
                     <div class="exclude-section">
                         <label><i class="fas fa-ban"></i> Исключить фильмы с этими темами в описании:</label>
                         <div class="exclude-tags">
-                            <button class="exclude-tag" data-tag="насилие">❌ насилие</button>
-                            <button class="exclude-tag" data-tag="жестокость">❌ жестокость</button>
-                            <button class="exclude-tag" data-tag="кровь">❌ кровь</button>
-                            <button class="exclude-tag" data-tag="ужасы">❌ ужасы</button>
-                            <button class="exclude-tag" data-tag="депрессия">❌ депрессия</button>
-                            <button class="exclude-tag" data-tag="трагедия">❌ трагедия</button>
+                            <button id="excludeViolenceBtn" class="exclude-tag">❌ насилие</button>
+                            <button id="excludeCrueltyBtn" class="exclude-tag">❌ жестокость</button>
+                            <button id="excludeBloodBtn" class="exclude-tag">❌ кровь</button>
+                            <button id="excludeHorrorBtn" class="exclude-tag">❌ ужасы</button>
+                            <button id="excludeDepressionBtn" class="exclude-tag">❌ депрессия</button>
+                            <button id="excludeTragedyBtn" class="exclude-tag">❌ трагедия</button>
                         </div>
                         <div class="exclude-custom">
                             <input type="text" id="customExclude" placeholder="Или введите свою тему...">
-                            <button id="addExcludeBtn" class="btn-secondary">+ Добавить</button>
+                            <button id="addExcludeBtn" class="btn-secondary">+ Добавить тему</button>
                         </div>
                         <div class="active-excludes">
                             <span>Активные исключения:</span>
@@ -84,11 +84,11 @@
                     </div>
                     
                     <div class="filter-actions">
-                        <button id="searchBtn" class="btn-primary" onclick="window.searchMovies()">
+                        <button id="searchBtn" class="btn-primary">
                             <i class="fas fa-search"></i> Найти идеальный фильм
                         </button>
-                        <button id="resetBtn" class="btn-secondary" onclick="window.resetFilters()">
-                            <i class="fas fa-undo-alt"></i> Сбросить
+                        <button id="resetBtn" class="btn-secondary">
+                            <i class="fas fa-undo-alt"></i> Сбросить фильтры
                         </button>
                     </div>
                 </div>
@@ -108,24 +108,26 @@
                 </div>
                 
                 <div class="pagination" id="pagination" style="display: none;">
-                    <button id="loadMoreBtn" class="btn-secondary" onclick="window.loadMore()">
+                    <button id="loadMoreBtn" class="btn-secondary">
                         <i class="fas fa-chevron-down"></i> Загрузить ещё
                     </button>
                 </div>
             </section>
         </div>
     </main>
+    
     <div id="reviewsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fas fa-comments"></i> Рецензии</h3>
-                <span class="close" onclick="window.closeModal()">&times;</span>
+                <span id="closeModalBtn" class="close">&times;</span>
             </div>
             <div class="modal-body" id="reviewsContent">
                 <p>Загрузка рецензий...</p>
             </div>
         </div>
     </div>
+    
     <script src="script.js"></script>
 </body>
 </html>
