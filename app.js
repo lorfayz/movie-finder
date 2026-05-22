@@ -1,336 +1,236 @@
-const API_KEY = '2b8b737c-2fb6-4c31-8e0c-62c9a2a1dc88';
-const API_BASE_URL = 'https://kinopoiskapiunofficial.tech/api';
+const API_KEY = '2b8b737c-2fb6-4c31-8e0c-62c9a2a1dc88'; 
+const API_BASE = 'https://kinopoiskapiunofficial.tech/api';
 
-let currentPage = 1;
-let totalPages = 0;
-let currentFilters = {};
-let excludeTags = [];
+// Состояние приложения
+let excludedKeywords = new Set();
 
+// DOM элементы
+const yearInput = document.getElementById('yearInput');
+const genreSelect = document.getElementById('genreSelect');
+const searchBtn = document.getElementById('searchBtn');
+const resultsContainer = document.getElementById('resultsContainer');
+const loadingIndicator = document.getElementById('loadingIndicator');
+const errorMessageDiv = document.getElementById('errorMessage');
+const customExcludeInput = document.getElementById('customExclude');
+const addExcludeBtn = document.getElementById('addExcludeBtn');
+const activeExcludesDiv = document.getElementById('activeExcludes');
+
+// Добавление тегов исключений из готовых чипов
+document.querySelectorAll('.exclude-tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+        const keyword = tag.getAttribute('data-tag');
+        if (!excludedKeywords.has(keyword)) {
+            excludedKeywords.add(keyword);
+            renderExcludeBadges();
+        }
+    });
+});
+
+// Добавление своей темы
+addExcludeBtn.addEventListener('click', () => {
+    const customWord = customExcludeInput.value.trim().toLowerCase();
+    if (customWord && !excludedKeywords.has(customWord)) {
+        excludedKeywords.add(customWord);
+        renderExcludeBadges();
+        customExcludeInput.value = '';
+    }
+});
+
+function renderExcludeBadges() {
+    activeExcludesDiv.innerHTML = '';
+    excludedKeywords.forEach(keyword => {
+        const badge = document.createElement('div');
+        badge.className = 'exclude-badge';
+        badge.innerHTML = `🚫 ${keyword} <button class="remove-exclude" data-word="${keyword}">✕</button>`;
+        activeExcludesDiv.appendChild(badge);
+    });
+    
+    document.querySelectorAll('.remove-exclude').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const word = btn.getAttribute('data-word');
+            excludedKeywords.delete(word);
+            renderExcludeBadges();
+        });
+    });
+}
+
+// Проверка описания на запрещенные слова
+function isDescriptionValid(description) {
+    if (!description) return true;
+    const lowerDesc = description.toLowerCase();
+    for (let keyword of excludedKeywords) {
+        if (lowerDesc.includes(keyword)) {
+            console.log(`Исключено из-за: ${keyword}`);
+            return false;
+        }
+    }
+    return true;
+}
+
+// Получение фильмов по году и жанру (используем поиск + фильтрация)
 async function searchMovies() {
-    console.log('🔍 Выполняется поиск фильмов...');
+    const year = yearInput.value.trim();
+    const genre = genreSelect.value;
     
-    const yearFrom = parseInt(document.getElementById('yearFrom').value) || 1890;
-    const yearTo = parseInt(document.getElementById('yearTo').value) || 2026;
-    const genreId = document.getElementById('genre').value;
-    const ratingFrom = parseFloat(document.getElementById('ratingFrom').value) || 0;
-    
-    if (yearFrom > yearTo) {
-        showNotification('Ошибка: год "от" не может быть больше года "до"', 'error');
+    if (!year || year < 1890 || year > 2030) {
+        showError('Введите корректный год (1890-2030)');
         return;
     }
     
-    currentFilters = { yearFrom, yearTo, genreId, ratingFrom };
-    currentPage = 1;
-    
-    showLoading();
+    showLoading(true);
+    resultsContainer.innerHTML = '';
+    errorMessageDiv.classList.add('hidden');
     
     try {
-        const movies = await fetchMovies();
-        displayMovies(movies);
-        console.log(`✅ Найдено ${movies.length} фильмов`);
-    } catch (error) {
-        console.error('❌ Ошибка поиска:', error);
-        showError('Не удалось загрузить фильмы. Проверьте API ключ и интернет-соединение.');
-    }
-}
-
-async function fetchMovies() {
-    const { yearFrom, yearTo, genreId, ratingFrom } = currentFilters;
-    
-    let url = `${API_BASE_URL}/v2.2/films?`;
-    const params = [];
-    
-    if (yearFrom && yearTo) {
-        params.push(`yearFrom=${yearFrom}`);
-        params.push(`yearTo=${yearTo}`);
-    }
-    if (genreId) params.push(`genres=${genreId}`);
-    if (ratingFrom) params.push(`ratingFrom=${ratingFrom}`);
-    params.push(`page=${currentPage}`);
-    params.push(`order=RATING`);
-    
-    url += params.join('&');
-    
-    console.log('📡 Запрос к API:', url);
-    
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-            'X-API-KEY': API_KEY,
-            'Content-Type': 'application/json'
+        // Шаг 1: Получаем фильмы по году через топ-листы или поиск
+        // Используем API: /api/v2.2/films?order=RATING&type=ALL&ratingFrom=0&yearFrom={year}&yearTo={year}
+        let url = `${API_BASE}/v2.2/films?order=RATING&type=ALL&ratingFrom=1&yearFrom=${year}&yearTo=${year}&page=1`;
+        
+        if (genre) {
+            // Получаем ID жанра (упрощенно — в реальном API нужно передавать жанр через фильтр)
+            // kinopoisk api имеет фильтр "genres" но требует ID. Для демо сделаем клиентскую фильтрацию.
+            url = `${API_BASE}/v2.2/films?order=RATING&type=ALL&ratingFrom=1&yearFrom=${year}&yearTo=${year}&page=1`;
         }
-    });
-    
-    if (!response.ok) {
-        if (response.status === 401) throw new Error('Неверный API ключ');
-        throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const data = await response.json();
-    totalPages = data.totalPages || 0;
-    
-    let filteredMovies = data.items || [];
-    
-    if (excludeTags.length > 0) {
-        filteredMovies = filteredMovies.filter(movie => {
-            const description = (movie.description || movie.shortDescription || '').toLowerCase();
-            for (const tag of excludeTags) {
-                if (description.includes(tag.toLowerCase())) return false;
+        
+        const response = await fetch(url, {
+            headers: {
+                'X-API-KEY': API_KEY,
+                'Content-Type': 'application/json'
             }
-            return true;
         });
-    }
-    
-    return filteredMovies;
-}
-
-async function loadMore() {
-    if (currentPage >= totalPages) {
-        showNotification('Это все фильмы!', 'info');
-        return;
-    }
-    
-    currentPage++;
-    try {
-        const moreMovies = await fetchMovies();
-        displayMovies(moreMovies, true);
+        
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('Неверный API ключ. Получите ключ на kinopoiskapiunofficial.tech');
+            throw new Error(`Ошибка API: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        let movies = data.items || [];
+        
+        // Фильтрация по жанру (на клиенте, т.к. API v2.2 фильтрует сложнее)
+        if (genre) {
+            movies = movies.filter(movie => {
+                if (!movie.genres) return false;
+                return movie.genres.some(g => g.genre.toLowerCase().includes(genre.toLowerCase()));
+            });
+        }
+        
+        // Добираем рецензии и описания для каждого фильма
+        const fullMovies = [];
+        for (let movie of movies.slice(0, 15)) { // лимит 15 фильмов
+            try {
+                const details = await fetchMovieDetails(movie.filmId);
+                if (details && isDescriptionValid(details.description)) {
+                    fullMovies.push({
+                        ...movie,
+                        description: details.description || 'Описание отсутствует',
+                        reviews: details.reviews || []
+                    });
+                } else if (details && !isDescriptionValid(details.description)) {
+                    console.log(`Фильм "${movie.nameRu}" исключен по описанию`);
+                }
+            } catch (err) {
+                console.warn(`Ошибка загрузки деталей ${movie.filmId}`, err);
+            }
+        }
+        
+        displayMovies(fullMovies);
+        
+        if (fullMovies.length === 0) {
+            resultsContainer.innerHTML = `<div class="error-message" style="display:block; grid-column:1/-1;">😢 Нет фильмов, подходящих под все критерии. Попробуйте другой год или исключите меньше тем.</div>`;
+        }
+        
     } catch (error) {
-        showNotification('Ошибка загрузки дополнительных фильмов', 'error');
+        console.error(error);
+        showError(error.message);
+    } finally {
+        showLoading(false);
     }
 }
 
-function displayMovies(movies, append = false) {
-    const container = document.getElementById('moviesContainer');
-    const resultsCount = document.getElementById('resultsCount');
-    const paginationDiv = document.getElementById('pagination');
+async function fetchMovieDetails(filmId) {
+    const detailUrl = `${API_BASE}/v2.2/films/${filmId}`;
+    const resp = await fetch(detailUrl, {
+        headers: { 'X-API-KEY': API_KEY }
+    });
+    if (!resp.ok) return null;
+    const filmData = await resp.json();
     
-    if (!append) container.innerHTML = '';
+    let description = filmData.description || filmData.shortDescription || '';
     
-    if (!movies || movies.length === 0) {
-        if (!append) {
-            container.innerHTML = `
-                <div class="loading-placeholder">
-                    <i class="fas fa-sad-tear"></i>
-                    <p>Фильмы не найдены. Попробуйте изменить параметры поиска или убрать исключения.</p>
+    // Пытаемся получить рецензии (для красоты)
+    let reviews = [];
+    try {
+        const reviewUrl = `${API_BASE}/v2.2/films/${filmId}/reviews?page=1`;
+        const revResp = await fetch(reviewUrl, {
+            headers: { 'X-API-KEY': API_KEY }
+        });
+        if (revResp.ok) {
+            const revData = await revResp.json();
+            reviews = revData.items?.slice(0, 1) || [];
+        }
+    } catch(e) {}
+    
+    return { description, reviews };
+}
+
+function displayMovies(movies) {
+    if (!movies.length) return;
+    
+    resultsContainer.innerHTML = movies.map(movie => {
+        const posterUrl = movie.posterUrlPreview || 'https://via.placeholder.com/300x400?text=Нет+постера';
+        const title = movie.nameRu || movie.nameOriginal || 'Без названия';
+        const yearMovie = movie.year;
+        const rating = movie.ratingKinopoisk ? `⭐ ${movie.ratingKinopoisk.toFixed(1)}` : 'Нет рейтинга';
+        const descriptionText = movie.description || 'Описание не загружено';
+        const reviewText = movie.reviews && movie.reviews[0] ? 
+            `🗣 Рецензия: ${movie.reviews[0].title || 'Мнение'}: ${movie.reviews[0].review?.substring(0, 120)}...` : 
+            '📝 Рецензий пока нет';
+        
+        return `
+            <div class="movie-card">
+                <img class="movie-poster" src="${posterUrl}" alt="${title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x400?text=Постер+недоступен'">
+                <div class="movie-info">
+                    <div class="movie-title">${title}</div>
+                    <div class="movie-year">${yearMovie} • ${rating}</div>
+                    <div class="description">${escapeHtml(descriptionText.substring(0, 150))}${descriptionText.length > 150 ? '…' : ''}</div>
+                    <div class="review">${escapeHtml(reviewText)}</div>
                 </div>
-            `;
-            resultsCount.textContent = '0 фильмов';
-        }
-        paginationDiv.style.display = 'none';
-        return;
-    }
-    
-    const currentCount = append ? parseInt(resultsCount.textContent.split(' ')[0]) : 0;
-    resultsCount.textContent = `${currentCount + movies.length} фильмов`;
-    
-    movies.forEach(movie => {
-        const movieCard = createMovieCard(movie);
-        container.appendChild(movieCard);
-    });
-    
-    paginationDiv.style.display = (currentPage < totalPages && movies.length > 0) ? 'block' : 'none';
-}
-
-function createMovieCard(movie) {
-    const card = document.createElement('div');
-    card.className = 'movie-card';
-    
-    const posterUrl = movie.posterUrlPreview || movie.posterUrl || 'https://via.placeholder.com/300x450?text=No+Poster';
-    const title = movie.nameRu || movie.nameOriginal || 'Название неизвестно';
-    const year = movie.year || 'Год не указан';
-    const rating = movie.ratingKinopoisk || movie.rating || '0';
-    const description = (movie.description || movie.shortDescription || 'Описание отсутствует').substring(0, 150);
-    const movieId = movie.kinopoiskId || movie.filmId;
-    
-    card.innerHTML = `
-        <div class="movie-poster">
-            <img src="${posterUrl}" alt="${title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450?text=No+Image'">
-            <div class="movie-rating"><i class="fas fa-star"></i> ${rating}</div>
-        </div>
-        <div class="movie-info">
-            <h3 class="movie-title">${escapeHtml(title)}</h3>
-            <div class="movie-year"><i class="far fa-calendar-alt"></i> ${year}</div>
-            <div class="movie-description">${escapeHtml(description)}...</div>
-            <div class="movie-actions">
-                <button class="review-btn" data-movie-id="${movieId}">
-                    <i class="fas fa-comment-dots"></i> Рецензии
-                </button>
             </div>
-        </div>
-    `;
-    
-    const reviewBtn = card.querySelector('.review-btn');
-    if (reviewBtn) {
-        reviewBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showReviews(movieId);
-        });
-    }
-    
-    return card;
-}
-
-async function showReviews(movieId) {
-    const modal = document.getElementById('reviewsModal');
-    const reviewsContent = document.getElementById('reviewsContent');
-    
-    modal.style.display = 'block';
-    reviewsContent.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Загрузка рецензий...</p>';
-    
-    try {
-        const reviews = await fetchReviews(movieId);
-        displayReviews(reviews);
-    } catch (error) {
-        reviewsContent.innerHTML = '<p class="no-reviews">❌ Не удалось загрузить рецензии</p>';
-    }
-}
-
-async function fetchReviews(movieId) {
-    const url = `${API_BASE_URL}/v2.2/films/${movieId}/reviews`;
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    return data.items || [];
-}
-
-function displayReviews(reviews) {
-    const reviewsContent = document.getElementById('reviewsContent');
-    if (!reviews || reviews.length === 0) {
-        reviewsContent.innerHTML = '<p class="no-reviews">📝 Рецензий на этот фильм пока нет</p>';
-        return;
-    }
-    
-    reviewsContent.innerHTML = '';
-    reviews.forEach(review => {
-        const reviewDiv = document.createElement('div');
-        reviewDiv.className = 'review-item';
-        reviewDiv.innerHTML = `
-            <div class="review-author">
-                <i class="fas fa-user"></i> ${escapeHtml(review.author || 'Аноним')}
-                ${review.type ? `<span style="color: #6366f1; margin-left: 10px;">(${review.type})</span>` : ''}
-            </div>
-            <div class="review-text">${escapeHtml(review.title ? review.title + ': ' : '')}${escapeHtml(review.description || review.review || 'Нет текста рецензии')}</div>
         `;
-        reviewsContent.appendChild(reviewDiv);
+    }).join('');
+}
+
+function escapeHtml(str) {
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+        return c;
     });
 }
 
-function addExcludeTag(tag) {
-    if (!excludeTags.includes(tag)) {
-        excludeTags.push(tag);
-        saveExcludeTags();
-        updateExcludeTagsDisplay();
-        showNotification(`Тема "${tag}" добавлена в исключения`, 'success');
+function showError(msg) {
+    errorMessageDiv.textContent = `⚠️ ${msg}`;
+    errorMessageDiv.classList.remove('hidden');
+}
+
+function showLoading(isLoading) {
+    if (isLoading) {
+        loadingIndicator.classList.remove('hidden');
+        searchBtn.disabled = true;
     } else {
-        showNotification(`Тема "${tag}" уже в списке исключений`, 'warning');
+        loadingIndicator.classList.add('hidden');
+        searchBtn.disabled = false;
     }
 }
 
-function removeExcludeTag(tag) {
-    excludeTags = excludeTags.filter(t => t !== tag);
-    saveExcludeTags();
-    updateExcludeTagsDisplay();
-    showNotification(`Тема "${tag}" удалена из исключений`, 'info');
-}
+searchBtn.addEventListener('click', searchMovies);
+window.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') searchMovies();
+});
 
-function updateExcludeTagsDisplay() {
-    const container = document.getElementById('activeExcludesList');
-    if (!container) return;
-    
-    if (excludeTags.length === 0) {
-        container.innerHTML = '<span style="color: #94a3b8;">Нет активных исключений</span>';
-        return;
-    }
-    
-    container.innerHTML = excludeTags.map(tag => `
-        <span class="exclude-badge" data-tag="${tag}">${tag} ✕</span>
-    `).join('');
-    
-    document.querySelectorAll('.exclude-badge').forEach(badge => {
-        badge.addEventListener('click', () => {
-            const tag = badge.getAttribute('data-tag');
-            removeExcludeTag(tag);
-        });
-    });
-}
-
-function saveExcludeTags() {
-    localStorage.setItem('excludeTags', JSON.stringify(excludeTags));
-}
-
-function loadExcludeTags() {
-    const saved = localStorage.getItem('excludeTags');
-    if (saved) {
-        try {
-            excludeTags = JSON.parse(saved);
-            updateExcludeTagsDisplay();
-        } catch (e) {
-            console.error('Ошибка загрузки тегов:', e);
-        }
-    }
-}
-
-function resetFilters() {
-    document.getElementById('yearFrom').value = '2010';
-    document.getElementById('yearTo').value = '2024';
-    document.getElementById('genre').value = '';
-    document.getElementById('ratingFrom').value = '7.0';
-    
-    excludeTags = [];
-    saveExcludeTags();
-    updateExcludeTagsDisplay();
-    
-    const container = document.getElementById('moviesContainer');
-    container.innerHTML = `
-        <div class="loading-placeholder">
-            <i class="fas fa-search"></i>
-            <p>Фильтры сброшены. Настройте параметры и нажмите "Найти фильм"</p>
-        </div>
-    `;
-    document.getElementById('resultsCount').textContent = '0 фильмов';
-    document.getElementById('pagination').style.display = 'none';
-    
-    showNotification('Все фильтры сброшены', 'success');
-}
-
-function closeModal() {
-    const modal = document.getElementById('reviewsModal');
-    if (modal) modal.style.display = 'none';
-}
-
-function showLoading() {
-    const container = document.getElementById('moviesContainer');
-    container.innerHTML = `
-        <div class="loading-placeholder">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Поиск идеального фильма...</p>
-        </div>
-    `;
-}
-
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.innerHTML = `<div style="position:fixed;top:20px;right:20px;padding:15px 20px;background:${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#6366f1'};color:white;border-radius:12px;z-index:10000;animation:slideIn 0.3s ease;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:14px;font-weight:500;">${message}</div>`;
-    document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 3000);
-}
-
-function showError(message) {
-    const container = document.getElementById('moviesContainer');
-    container.innerHTML = `<div class="loading-placeholder"><i class="fas fa-exclamation-triangle"></i><p style="color:#ef4444;">${message}</p></div>`;
-    showNotification(message, 'error');
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-const style = document.createElement('style');
-style.textContent = `@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}`;
-document.head.appendChild(style);
+// Инициализация
+renderExcludeBadges();
